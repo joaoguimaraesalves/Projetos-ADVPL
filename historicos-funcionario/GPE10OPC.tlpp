@@ -1,0 +1,20 @@
+#include "tlpp-core.th"
+#include "totvs.ch"
+
+/*/{Protheus.doc} GPE10OPC
+Ponto de entrada — inclui a opção "Históricos" no menu (MenuDef) do Cadastro
+de Funcionários (GPEA010). Por estar na MenuDef, a opção aparece no cadastro de
+Privilégios do Configurador.
+Documentação: https://tdn.totvs.com/pages/releaseview.action?pageId=1021200371
+@type user function
+@author João Victor Guimarães Alves
+@since 29/10/2026
+@return array, opções no formato do aRotina
+@obs Se o ambiente já tiver um GPE10OPC, juntar o aAdd abaixo ao fonte existente.
+@see GPEA010
+/*/
+User Function GPE10OPC() as Array
+    Local aNewOpc := {} as Array
+
+    aAdd(aNewOpc, {"Históricos", "U_ZGPA010F", 0, 7, 0, Nil})
+Return aNewOpc

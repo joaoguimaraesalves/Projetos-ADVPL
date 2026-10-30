@@ -1,0 +1,8 @@
+# Fontes Protheus: manter os bytes como estao (Windows-1252 + CRLF).
+# O compilador do Protheus so aceita CP1252; nao converter nem normalizar fim de linha.
+*.prw -text
+*.PRW -text
+*.prx -text
+*.tlpp -text
+*.ch -text
+*.th -text

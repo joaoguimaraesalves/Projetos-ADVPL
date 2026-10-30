@@ -1,0 +1,359 @@
+#include "tlpp-core.th"
+#include "totvs.ch"
+#include "fwmvcdef.ch"
+
+// Tipos de histórico do funcionário (tabela ZHF)
+#Define ZGP_TIPOS_SIMNAO "02|03|08|11|12|13"
+#Define ZGP_TIPOS_CAMPO  "01|05|06|07|10"
+#Define ZGP_MAPA_PADRAO  "01=RA_XCODEFUN;05=RA_ADCPERI;06=RA_ADCINS;07=RA_XPERELE;10="
+
+/*/{Protheus.doc} ZGPX010C
+Lista de opções do campo ZHF_TIPO (usada no X3_CBOX como #U_ZGPX010C()).
+@type user function
+@author João Victor Guimarães Alves
+@since 29/10/2026
+@return character, opções no formato "01=Descrição;02=Descrição"
+/*/
+User Function ZGPX010C() as Character
+    Local cOpcoes := "" as Character
+
+    cOpcoes := "01=Função gratificada;"
+    cOpcoes += "02=Horário reduzido;"
+    cOpcoes += "03=Licença sem vencimento;"
+    cOpcoes += "04=Penalidade/TAC;"
+    cOpcoes += "05=Periculosidade;"
+    cOpcoes += "06=Insalubridade;"
+    cOpcoes += "07=Periculosidade judicial;"
+    cOpcoes += "08=Comissão;"
+    cOpcoes += "09=Auxílio creche/financeiro;"
+    cOpcoes += "10=Ticket;"
+    cOpcoes += "11=Condutor;"
+    cOpcoes += "12=Elogio;"
+    cOpcoes += "13=Licença paternidade"
+Return cOpcoes
+
+/*/{Protheus.doc} ZGPX010T
+Descrição de um tipo de histórico.
+@type user function
+@author João Victor Guimarães Alves
+@since 29/10/2026
+@param cTipo, character, código do tipo (ZHF_TIPO)
+@return character, descrição do tipo
+/*/
+User Function ZGPX010T(cTipo as Character) as Character
+Return OpcaoCombo(U_ZGPX010C(), cTipo)
+
+/*/{Protheus.doc} ZGPX010I
+Inicializador padrão do ZHF_MAT: traz a matrícula do funcionário quando a tela
+foi aberta pelo Cadastro de Funcionários (variável cZgpMatCtx).
+@type user function
+@author João Victor Guimarães Alves
+@since 29/10/2026
+@return character, matrícula ou vazio
+/*/
+User Function ZGPX010I() as Character
+    Local cMat := "" as Character
+
+    If Type("cZgpMatCtx") == "C"
+        cMat := &("cZgpMatCtx")
+    EndIf
+Return cMat
+
+/*/{Protheus.doc} ZGPX010N
+Inicializador do campo virtual ZHF_NOME (nome do funcionário).
+@type user function
+@author João Victor Guimarães Alves
+@since 29/10/2026
+@return character, nome do funcionário
+/*/
+User Function ZGPX010N() as Character
+    Local cNome  := "" as Character
+    Local oModel := Nil as Object
+    Local cMat   := "" as Character
+    Local cFil   := "" as Character
+
+    oModel := FWModelActive()
+    If oModel <> Nil .And. oModel:GetOperation() == MODEL_OPERATION_INSERT
+        cMat := U_ZGPX010I()
+        cFil := xFilial("SRA")
+    Else
+        cMat := ZHF->ZHF_MAT
+        cFil := ZHF->ZHF_FILIAL
+    EndIf
+
+    If !Empty(cMat)
+        cNome := Posicione("SRA", 1, cFil + cMat, "RA_NOME")
+    EndIf
+Return cNome
+
+/*/{Protheus.doc} ZGPX010S
+Próxima sequência do histórico para filial + matrícula + tipo.
+@type user function
+@author João Victor Guimarães Alves
+@since 29/10/2026
+@param cFil, character, filial da ZHF
+@param cMat, character, matrícula
+@param cTipo, character, tipo do histórico
+@return character, sequência (3 posições)
+/*/
+User Function ZGPX010S(cFil as Character, cMat as Character, cTipo as Character) as Character
+    Local cSeq    := "001" as Character
+    Local aArea   := GetArea() as Array
+    Local aAreaZH := ZHF->(GetArea()) as Array
+
+    If UltimoHist(cFil, cMat, cTipo)
+        cSeq := Soma1(ZHF->ZHF_SEQ)
+    EndIf
+
+    RestArea(aAreaZH)
+    RestArea(aArea)
+Return cSeq
+
+/*/{Protheus.doc} ZGPX010M
+Lê o parâmetro MV_ZHFCPOS e devolve o mapa tipo x campo da SRA monitorado.
+Chamar fora de laços e repassar o resultado para ZGPX010G.
+@type user function
+@author João Victor Guimarães Alves
+@since 29/10/2026
+@return array, {{cTipo, cCampo}, ...}
+/*/
+User Function ZGPX010M() as Array
+    Local aMapa  := {} as Array
+    Local aItens := {} as Array
+    Local aPar   := {} as Array
+    Local cPar   := "" as Character
+    Local nI     := 0 as Numeric
+
+    cPar   := AllTrim(GetNewPar("MV_ZHFCPOS", ZGP_MAPA_PADRAO))
+    aItens := StrTokArr(cPar, ";")
+
+    For nI := 1 To Len(aItens)
+        aPar := StrTokArr(aItens[nI] + " ", "=")
+        If Len(aPar) >= 2 .And. !Empty(aPar[2])
+            aAdd(aMapa, {PadR(AllTrim(aPar[1]), 2), Upper(AllTrim(aPar[2]))})
+        EndIf
+    Next nI
+Return aMapa
+
+/*/{Protheus.doc} ZGPX010G
+Compara os campos monitorados do funcionário posicionado na SRA com o último
+histórico de cada tipo e grava uma linha nova na ZHF quando o valor mudou.
+Não usa interface: pode rodar dentro do ponto de entrada de gravação.
+@type user function
+@author João Victor Guimarães Alves
+@since 29/10/2026
+@param cOrigem, character, "2" = automática (cadastro), "3" = carga inicial
+@param aMapa, array, mapa de ZGPX010M (opcional; lido do parâmetro se vazio)
+@return numeric, quantidade de linhas gravadas
+/*/
+User Function ZGPX010G(cOrigem as Character, aMapa as Array) as Numeric
+    Local nGrav    := 0 as Numeric
+    Local nI       := 0 as Numeric
+    Local nPos     := 0 as Numeric
+    Local aArea    := GetArea() as Array
+    Local aAreaZH  := ZHF->(GetArea()) as Array
+    Local cFilZHF  := "" as Character
+    Local cMat     := "" as Character
+    Local cTipo    := "" as Character
+    Local cCampo   := "" as Character
+    Local cValor   := "" as Character
+    Local cAnt     := "" as Character
+    Local cSeq     := "" as Character
+    Local lTemHist := .F. as Logical
+    Local dData    := CToD("") as Date
+
+    If Empty(aMapa)
+        aMapa := U_ZGPX010M()
+    EndIf
+
+    If SRA->(Eof()) .Or. Empty(aMapa)
+        Return nGrav
+    EndIf
+
+    cFilZHF := xFilial("ZHF", SRA->RA_FILIAL)
+    cMat    := SRA->RA_MAT
+
+    For nI := 1 To Len(aMapa)
+        cTipo  := aMapa[nI][1]
+        cCampo := aMapa[nI][2]
+        nPos   := SRA->(FieldPos(cCampo))
+
+        If nPos == 0
+            Loop
+        EndIf
+
+        cValor   := ValorTexto(SRA->(FieldGet(nPos)))
+        lTemHist := UltimoHist(cFilZHF, cMat, cTipo)
+        cAnt     := ""
+        cSeq     := "001"
+
+        If lTemHist
+            cAnt := AllTrim(ZHF->ZHF_VLNOV)
+            cSeq := Soma1(ZHF->ZHF_SEQ)
+        EndIf
+
+        If cOrigem == "3" .And. lTemHist
+            Loop
+        EndIf
+
+        If !lTemHist .And. Empty(cValor)
+            Loop
+        EndIf
+
+        If lTemHist .And. cAnt == cValor
+            Loop
+        EndIf
+
+        dData := dDataBase
+        If cTipo == "01" .And. SRA->(FieldPos("RA_DTDESIG")) > 0
+            If !Empty(SRA->(FieldGet(FieldPos("RA_DTDESIG"))))
+                dData := SRA->(FieldGet(FieldPos("RA_DTDESIG")))
+            EndIf
+        EndIf
+
+        RecLock("ZHF", .T.)
+        ZHF->ZHF_FILIAL := cFilZHF
+        ZHF->ZHF_MAT    := cMat
+        ZHF->ZHF_TIPO   := cTipo
+        ZHF->ZHF_SEQ    := cSeq
+        ZHF->ZHF_DATA   := dData
+        ZHF->ZHF_VLANT  := cAnt
+        ZHF->ZHF_VLNOV  := cValor
+        ZHF->ZHF_ORIGEM := cOrigem
+        ZHF->ZHF_USER   := cUserName
+        ZHF->ZHF_DTINC  := Date()
+        ZHF->ZHF_HRINC  := Time()
+        ZHF->(MsUnlock())
+
+        nGrav++
+    Next nI
+
+    RestArea(aAreaZH)
+    RestArea(aArea)
+Return nGrav
+
+/*/{Protheus.doc} ZGPX010D
+Descrição da situação de uma linha do histórico (Sim/Não, penalidade ou
+tipo de auxílio), usada no relatório.
+@type user function
+@author João Victor Guimarães Alves
+@since 29/10/2026
+@param cTipo, character, tipo do histórico
+@param cSituac, character, conteúdo de ZHF_SITUAC
+@param cPenal, character, conteúdo de ZHF_PENAL
+@param cTpAux, character, conteúdo de ZHF_TPAUX
+@return character, descrição
+/*/
+User Function ZGPX010D(cTipo as Character, cSituac as Character, cPenal as Character, cTpAux as Character) as Character
+    Local cDesc := "" as Character
+
+    If cTipo == "04"
+        cDesc := OpcaoCombo("1=Advertência;2=Suspensão;3=TAC", cPenal)
+    ElseIf cTipo == "09"
+        cDesc := OpcaoCombo("1=Auxílio creche;2=Auxílio financeiro", cTpAux)
+    ElseIf cTipo $ ZGP_TIPOS_SIMNAO
+        cDesc := OpcaoCombo("1=Sim;2=Não", cSituac)
+    EndIf
+Return cDesc
+
+/*/{Protheus.doc} ZGPX010L
+Indica se o tipo usa o campo Sim/Não, Penalidade, Auxílio ou Valor.
+@type user function
+@author João Victor Guimarães Alves
+@since 29/10/2026
+@param cGrupo, character, "SIMNAO" ou "CAMPO"
+@return character, códigos separados por |
+/*/
+User Function ZGPX010L(cGrupo as Character) as Character
+    Local cTipos := "" as Character
+
+    If cGrupo == "SIMNAO"
+        cTipos := ZGP_TIPOS_SIMNAO
+    ElseIf cGrupo == "CAMPO"
+        cTipos := ZGP_TIPOS_CAMPO
+    EndIf
+Return cTipos
+
+/*/{Protheus.doc} UltimoHist
+Posiciona a ZHF no último histórico de filial + matrícula + tipo.
+@type static function
+@author João Victor Guimarães Alves
+@since 29/10/2026
+@param cFil, character, filial
+@param cMat, character, matrícula
+@param cTipo, character, tipo
+@return logical, .T. quando existe histórico (ZHF posicionada nele)
+/*/
+Static Function UltimoHist(cFil as Character, cMat as Character, cTipo as Character) as Logical
+    Local lAchou := .F. as Logical
+    Local cChave := "" as Character
+
+    cChave := cFil + cMat + cTipo
+
+    ZHF->(DbSetOrder(1)) // ZHF_FILIAL+ZHF_MAT+ZHF_TIPO+ZHF_SEQ
+    ZHF->(DbSeek(cChave + "ZZZ", .T.))
+    ZHF->(DbSkip(-1))
+
+    If !ZHF->(Bof()) .And. !ZHF->(Eof())
+        lAchou := (ZHF->(ZHF_FILIAL + ZHF_MAT + ZHF_TIPO) == cChave)
+    EndIf
+Return lAchou
+
+/*/{Protheus.doc} ValorTexto
+Converte o conteúdo de um campo em texto para gravar no histórico.
+@type static function
+@author João Victor Guimarães Alves
+@since 29/10/2026
+@param xValor, variant, conteúdo do campo
+@return character, texto
+/*/
+Static Function ValorTexto(xValor as Variant) as Character
+    Local cTexto := "" as Character
+    Local cTipo  := ValType(xValor) as Character
+
+    If cTipo == "C"
+        cTexto := AllTrim(xValor)
+    ElseIf cTipo == "D"
+        If !Empty(xValor)
+            cTexto := DToC(xValor)
+        EndIf
+    ElseIf cTipo == "N"
+        cTexto := AllTrim(cValToChar(xValor))
+    ElseIf cTipo == "L"
+        If xValor
+            cTexto := "S"
+        Else
+            cTexto := "N"
+        EndIf
+    EndIf
+Return Left(cTexto, 60)
+
+/*/{Protheus.doc} OpcaoCombo
+Devolve a descrição de um código numa lista "1=A;2=B".
+@type static function
+@author João Victor Guimarães Alves
+@since 29/10/2026
+@param cLista, character, lista de opções
+@param cCodigo, character, código procurado
+@return character, descrição (vazio se não achar)
+/*/
+Static Function OpcaoCombo(cLista as Character, cCodigo as Character) as Character
+    Local cDesc  := "" as Character
+    Local aItens := {} as Array
+    Local nI     := 0 as Numeric
+    Local nPos   := 0 as Numeric
+    Local cCod   := AllTrim(cCodigo) as Character
+
+    If Empty(cCod)
+        Return cDesc
+    EndIf
+
+    aItens := StrTokArr(cLista, ";")
+    For nI := 1 To Len(aItens)
+        nPos := At("=", aItens[nI])
+        If nPos > 0 .And. AllTrim(Left(aItens[nI], nPos - 1)) == cCod
+            cDesc := SubStr(aItens[nI], nPos + 1)
+            Exit
+        EndIf
+    Next nI
+Return cDesc

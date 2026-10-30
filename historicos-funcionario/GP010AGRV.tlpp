@@ -1,0 +1,43 @@
+#include "tlpp-core.th"
+#include "totvs.ch"
+
+/*/{Protheus.doc} GP010AGRV
+Ponto de entrada — após a gravação do Cadastro de Funcionários (GPEA010).
+Grava na ZHF o histórico dos campos monitorados que mudaram.
+Documentação: https://centraldeatendimento.totvs.com/hc/pt-br/articles/360020432511
+
+PARAMIXB:
+  [1] Numeric — operação (3 = Incluir, 4 = Alterar, 5 = Excluir)
+  [2] Logical — indica se gravou
+
+@type user function
+@author João Victor Guimarães Alves
+@since 29/10/2026
+@obs Sem interface: pode rodar dentro da transação de gravação.
+     Se o ambiente já tiver um GP010AGRV, juntar a chamada U_ZGPX010G ao fonte existente.
+@see GPEA010
+/*/
+User Function GP010AGRV()
+    Local nOpc   := 0 as Numeric
+    Local lGrava := .F. as Logical
+    Local oError := Nil as Object
+
+    If Type("PARAMIXB") <> "A" .Or. Len(PARAMIXB) < 2
+        Return Nil
+    EndIf
+
+    If ValType(PARAMIXB[1]) == "N"
+        nOpc := PARAMIXB[1]
+    EndIf
+    If ValType(PARAMIXB[2]) == "L"
+        lGrava := PARAMIXB[2]
+    EndIf
+
+    If lGrava .And. (nOpc == 3 .Or. nOpc == 4)
+        Try
+            U_ZGPX010G("2")
+        Catch oError
+            FWLogMsg("ERROR", , "ZGPX010", "GP010AGRV", , "01", "Falha ao gravar histórico ZHF: " + oError:Description, 0, 0, {})
+        EndTry
+    EndIf
+Return Nil

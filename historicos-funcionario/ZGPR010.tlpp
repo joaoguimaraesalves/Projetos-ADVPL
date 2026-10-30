@@ -1,0 +1,196 @@
+#include "tlpp-core.th"
+#include "totvs.ch"
+
+/*/{Protheus.doc} ZGPR010
+Relatório de Históricos do Funcionário (tabela ZHF), por funcionário,
+tipo e período. Inclui Penalidades/TAC e Comissão.
+@type user function
+@author João Victor Guimarães Alves
+@since 29/10/2026
+/*/
+User Function ZGPR010()
+    Local aPergs  := {} as Array
+    Local aResp   := {} as Array
+    Local aTipos  := {} as Array
+    Local oReport := Nil as Object
+    Local nTamMat := TamSX3("RA_MAT")[1] as Numeric
+
+    aTipos := StrTokArr("00=Todos;" + U_ZGPX010C(), ";")
+
+    aAdd(aPergs, {1, "Matrícula de",  Space(nTamMat),             "", "", "SRA", "", 50, .F.})
+    aAdd(aPergs, {1, "Matrícula até", Replicate("Z", nTamMat),     "", "", "SRA", "", 50, .F.})
+    aAdd(aPergs, {2, "Tipo",          1, aTipos, 120, ".T.", .T.})
+    aAdd(aPergs, {1, "Data de",       CToD(""),                    "", "", "",    "", 50, .F.})
+    aAdd(aPergs, {1, "Data até",      dDataBase,                   "", "", "",    "", 50, .F.})
+
+    If !ParamBox(aPergs, "Históricos do Funcionário", @aResp, , , , , , , , .F., .F.)
+        Return
+    EndIf
+
+    oReport := ReportDef(aResp)
+    oReport:PrintDialog()
+Return
+
+/*/{Protheus.doc} ReportDef
+Definição do relatório.
+@type static function
+@author João Victor Guimarães Alves
+@since 29/10/2026
+@param aResp, array, respostas do ParamBox
+@return object, TReport
+/*/
+Static Function ReportDef(aResp as Array) as Object
+    Local oReport := Nil as Object
+    Local oSecFun := Nil as Object
+    Local oSecHis := Nil as Object
+    Local cTab    := GetNextAlias() as Character
+
+    oReport := TReport():New("ZGPR010", "Históricos do Funcionário", /*cPergunta*/, ;
+        {|oRep| ReportPrint(oRep, cTab, oSecFun, oSecHis, aResp)}, ;
+        "Lista os históricos do funcionário (tabela ZHF) por matrícula, tipo e período.")
+
+    oSecFun := TRSection():New(oReport, "Funcionário", {"ZHF", "SRA"})
+    TRCell():New(oSecFun, "ZHF_MAT", "ZHF", "Matrícula", , TamSX3("RA_MAT")[1] + 4,  .F., {|| (cTab)->ZHF_MAT})
+    TRCell():New(oSecFun, "RA_NOME", "SRA", "Nome",      , TamSX3("RA_NOME")[1] + 4, .F., {|| (cTab)->RA_NOME})
+
+    oSecHis := TRSection():New(oSecFun, "Históricos", {"ZHF"})
+    TRCell():New(oSecHis, "TIPO",       "", "Tipo",        , 28, .F., {|| U_ZGPX010T((cTab)->ZHF_TIPO)})
+    TRCell():New(oSecHis, "ZHF_DATA",   "", "Data",        , 12, .F., {|| SToD((cTab)->ZHF_DATA)})
+    TRCell():New(oSecHis, "SITUACAO",   "", "Situação",    , 20, .F., {|| U_ZGPX010D((cTab)->ZHF_TIPO, (cTab)->ZHF_SITUAC, (cTab)->ZHF_PENAL, (cTab)->ZHF_TPAUX)})
+    TRCell():New(oSecHis, "ZHF_DEPEND", "", "Dep.",        , 5,  .F., {|| (cTab)->ZHF_DEPEND})
+    TRCell():New(oSecHis, "ZHF_PROCES", "", "Processo",    , 40, .F., {|| (cTab)->ZHF_PROCES})
+    TRCell():New(oSecHis, "ZHF_VLANT",  "", "Valor ant.",  , 20, .F., {|| (cTab)->ZHF_VLANT})
+    TRCell():New(oSecHis, "ZHF_VLNOV",  "", "Valor novo",  , 20, .F., {|| (cTab)->ZHF_VLNOV})
+    TRCell():New(oSecHis, "ORIGEM",     "", "Origem",      , 14, .F., {|| DescOrigem((cTab)->ZHF_ORIGEM)})
+    TRCell():New(oSecHis, "ZHF_USER",   "", "Usuário",     , 25, .F., {|| (cTab)->ZHF_USER})
+Return oReport
+
+/*/{Protheus.doc} ReportPrint
+Impressão do relatório.
+@type static function
+@author João Victor Guimarães Alves
+@since 29/10/2026
+@param oReport, object, relatório
+@param cTab, character, alias da consulta
+@param oSecFun, object, seção do funcionário
+@param oSecHis, object, seção dos históricos
+@param aResp, array, respostas do ParamBox
+/*/
+Static Function ReportPrint(oReport as Object, cTab as Character, oSecFun as Object, oSecHis as Object, aResp as Array)
+    Local aArea   := GetArea() as Array
+    Local oStmt   := Nil as Object
+    Local cQuery  := "" as Character
+    Local cTipo   := "" as Character
+    Local cChave  := "" as Character
+    Local cDataDe := "" as Character
+    Local cDataAt := "" as Character
+    Local nParam  := 0 as Numeric
+
+    cTipo := TipoEscolhido(aResp[3])
+
+    cDataDe := DToS(aResp[4])
+    cDataAt := DToS(aResp[5])
+    If Empty(cDataAt)
+        cDataAt := "99991231"
+    EndIf
+
+    cQuery := "SELECT ZHF.ZHF_MAT, ZHF.ZHF_TIPO, ZHF.ZHF_SEQ, ZHF.ZHF_DATA, ZHF.ZHF_SITUAC, ZHF.ZHF_PENAL, "
+    cQuery += "ZHF.ZHF_TPAUX, ZHF.ZHF_DEPEND, ZHF.ZHF_PROCES, ZHF.ZHF_VLANT, ZHF.ZHF_VLNOV, ZHF.ZHF_ORIGEM, "
+    cQuery += "ZHF.ZHF_USER, COALESCE(SRA.RA_NOME, ' ') RA_NOME "
+    cQuery += "FROM " + RetSqlName("ZHF") + " ZHF "
+    cQuery += "LEFT JOIN " + RetSqlName("SRA") + " SRA "
+    cQuery += "  ON SRA.RA_FILIAL = ? AND SRA.RA_MAT = ZHF.ZHF_MAT AND SRA.D_E_L_E_T_ = ? "
+    cQuery += "WHERE ZHF.D_E_L_E_T_ = ? "
+    cQuery += "AND ZHF.ZHF_FILIAL = ? "
+    cQuery += "AND ZHF.ZHF_MAT BETWEEN ? AND ? "
+    cQuery += "AND ZHF.ZHF_DATA BETWEEN ? AND ? "
+    If !Empty(cTipo)
+        cQuery += "AND ZHF.ZHF_TIPO = ? "
+    EndIf
+    cQuery += "ORDER BY ZHF.ZHF_MAT, ZHF.ZHF_TIPO, ZHF.ZHF_DATA, ZHF.ZHF_SEQ"
+
+    oStmt := FWExecStatement():New(ChangeQuery(cQuery))
+    oStmt:SetString(++nParam, xFilial("SRA"))
+    oStmt:SetString(++nParam, " ")
+    oStmt:SetString(++nParam, " ")
+    oStmt:SetString(++nParam, xFilial("ZHF"))
+    oStmt:SetString(++nParam, aResp[1])
+    oStmt:SetString(++nParam, aResp[2])
+    oStmt:SetString(++nParam, cDataDe)
+    oStmt:SetString(++nParam, cDataAt)
+    If !Empty(cTipo)
+        oStmt:SetString(++nParam, cTipo)
+    EndIf
+
+    cTab := oStmt:OpenAlias(cTab)
+    oStmt:Destroy()
+
+    oReport:SetMeter((cTab)->(LastRec()))
+
+    While !oReport:Cancel() .And. !(cTab)->(Eof())
+        cChave := (cTab)->ZHF_MAT
+
+        oSecFun:Init()
+        oSecFun:PrintLine()
+        oSecHis:Init()
+
+        While !oReport:Cancel() .And. !(cTab)->(Eof()) .And. (cTab)->ZHF_MAT == cChave
+            oReport:IncMeter()
+            oSecHis:PrintLine()
+            (cTab)->(DbSkip())
+        EndDo
+
+        oSecHis:Finish()
+        oSecFun:Finish()
+        oReport:SkipLine()
+    EndDo
+
+    (cTab)->(DbCloseArea())
+    RestArea(aArea)
+Return
+
+/*/{Protheus.doc} TipoEscolhido
+Converte a resposta do combo de tipo no código (vazio = todos).
+@type static function
+@author João Victor Guimarães Alves
+@since 29/10/2026
+@param xResp, variant, resposta do ParamBox (posição ou texto)
+@return character, código do tipo ou vazio
+/*/
+Static Function TipoEscolhido(xResp as Variant) as Character
+    Local cTipo := "" as Character
+    Local aOpc  := {} as Array
+
+    If ValType(xResp) == "N"
+        aOpc := StrTokArr("00=Todos;" + U_ZGPX010C(), ";")
+        If xResp >= 1 .And. xResp <= Len(aOpc)
+            cTipo := Left(aOpc[xResp], 2)
+        EndIf
+    Else
+        cTipo := Left(AllTrim(xResp), 2)
+    EndIf
+
+    If cTipo == "00"
+        cTipo := ""
+    EndIf
+Return cTipo
+
+/*/{Protheus.doc} DescOrigem
+Descrição da origem da linha.
+@type static function
+@author João Victor Guimarães Alves
+@since 29/10/2026
+@param cOrigem, character, ZHF_ORIGEM
+@return character, descrição
+/*/
+Static Function DescOrigem(cOrigem as Character) as Character
+    Local cDesc := "" as Character
+
+    If cOrigem == "1"
+        cDesc := "Manual"
+    ElseIf cOrigem == "2"
+        cDesc := "Automática"
+    ElseIf cOrigem == "3"
+        cDesc := "Carga inicial"
+    EndIf
+Return cDesc
