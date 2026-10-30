@@ -44,24 +44,26 @@ Static Function ReportDef(aResp as Array) as Object
     Local oSecFun := Nil as Object
     Local oSecHis := Nil as Object
     Local cTab    := GetNextAlias() as Character
+    Local aMapa   := U_ZGPX010M() as Array
 
     oReport := TReport():New("ZGPR010", "Históricos do Funcionário", /*cPergunta*/, ;
         {|oRep| ReportPrint(oRep, cTab, oSecFun, oSecHis, aResp)}, ;
         "Lista os históricos do funcionário (tabela ZHF) por matrícula, tipo e período.")
+    oReport:SetLandscape()
 
     oSecFun := TRSection():New(oReport, "Funcionário", {"ZHF", "SRA"})
     TRCell():New(oSecFun, "ZHF_MAT", "ZHF", "Matrícula", , TamSX3("RA_MAT")[1] + 4,  .F., {|| (cTab)->ZHF_MAT})
     TRCell():New(oSecFun, "RA_NOME", "SRA", "Nome",      , TamSX3("RA_NOME")[1] + 4, .F., {|| (cTab)->RA_NOME})
 
     oSecHis := TRSection():New(oSecFun, "Históricos", {"ZHF"})
-    // Célula da data com nome fora do dicionário: com "ZHF_DATA" o TReport usava o tamanho do SX3 (8) e cortava o ano.
+    // Células de data e valores com nome fora do dicionário: com o nome do campo (ex.: "ZHF_DATA") o TReport usa o tamanho do SX3 e corta o conteúdo.
     TRCell():New(oSecHis, "TIPO",       "", "Tipo",        , 28, .F., {|| U_ZGPX010T((cTab)->ZHF_TIPO)})
     TRCell():New(oSecHis, "DATAHIST",   "", "Data",        , 12, .F., {|| DToC(SToD((cTab)->ZHF_DATA))})
     TRCell():New(oSecHis, "SITUACAO",   "", "Situação",    , 20, .F., {|| U_ZGPX010D((cTab)->ZHF_TIPO, (cTab)->ZHF_SITUAC, (cTab)->ZHF_PENAL, (cTab)->ZHF_TPAUX)})
     TRCell():New(oSecHis, "ZHF_DEPEND", "", "Dep.",        , 5,  .F., {|| (cTab)->ZHF_DEPEND})
     TRCell():New(oSecHis, "ZHF_PROCES", "", "Processo",    , 40, .F., {|| (cTab)->ZHF_PROCES})
-    TRCell():New(oSecHis, "ZHF_VLANT",  "", "Valor ant.",  , 20, .F., {|| (cTab)->ZHF_VLANT})
-    TRCell():New(oSecHis, "ZHF_VLNOV",  "", "Valor novo",  , 20, .F., {|| (cTab)->ZHF_VLNOV})
+    TRCell():New(oSecHis, "VALANT",     "", "Valor ant.",  , 35, .F., {|| U_ZGPX010V((cTab)->ZHF_TIPO, (cTab)->ZHF_VLANT, aMapa)})
+    TRCell():New(oSecHis, "VALNOV",     "", "Valor novo",  , 35, .F., {|| U_ZGPX010V((cTab)->ZHF_TIPO, (cTab)->ZHF_VLNOV, aMapa)})
     TRCell():New(oSecHis, "ORIGEM",     "", "Origem",      , 14, .F., {|| DescOrigem((cTab)->ZHF_ORIGEM)})
     TRCell():New(oSecHis, "ZHF_USER",   "", "Usuário",     , 25, .F., {|| (cTab)->ZHF_USER})
 Return oReport

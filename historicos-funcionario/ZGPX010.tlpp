@@ -5,7 +5,8 @@
 // Tipos de histórico do funcionário (tabela ZHF)
 #Define ZGP_TIPOS_SIMNAO "02|03|08|11|12|13"
 #Define ZGP_TIPOS_CAMPO  "01|05|06|07|10"
-#Define ZGP_MAPA_PADRAO  "01=RA_XCODEFUN;05=RA_ADCPERI;06=RA_ADCINS;07=RA_XPERELE;10="
+#Define ZGP_OPC_AUXILIO  "1=Creche;2=Creche judicial;3=Financeiro;4=Financeiro judicial"
+#Define ZGP_MAPA_PADRAO  "01=RA_XCODFUN;05=RA_ADCPERI;06=RA_ADCINS;07=RA_XPERELE;10=RA_XOPTICK"
 
 /*/{Protheus.doc} ZGPX010C
 Lista de opções do campo ZHF_TIPO (usada no X3_CBOX como #U_ZGPX010C()).
@@ -205,10 +206,8 @@ User Function ZGPX010G(cOrigem as Character, aMapa as Array) as Numeric
         EndIf
 
         dData := dDataBase
-        If cTipo == "01" .And. SRA->(FieldPos("RA_DTDESIG")) > 0
-            If !Empty(SRA->(FieldGet(FieldPos("RA_DTDESIG"))))
-                dData := SRA->(FieldGet(FieldPos("RA_DTDESIG")))
-            EndIf
+        If cTipo == "01"
+            dData := DataFuncao(Empty(cValor), dData)
         EndIf
 
         RecLock("ZHF", .T.)
@@ -250,7 +249,7 @@ User Function ZGPX010D(cTipo as Character, cSituac as Character, cPenal as Chara
     If cTipo == "04"
         cDesc := OpcaoCombo("1=Advertência;2=Suspensão;3=TAC", cPenal)
     ElseIf cTipo == "09"
-        cDesc := OpcaoCombo("1=Auxílio creche;2=Auxílio financeiro", cTpAux)
+        cDesc := OpcaoCombo(ZGP_OPC_AUXILIO, cTpAux)
     ElseIf cTipo $ ZGP_TIPOS_SIMNAO
         cDesc := OpcaoCombo("1=Sim;2=Não", cSituac)
     EndIf
@@ -273,6 +272,82 @@ User Function ZGPX010L(cGrupo as Character) as Character
         cTipos := ZGP_TIPOS_CAMPO
     EndIf
 Return cTipos
+
+/*/{Protheus.doc} ZGPX010V
+Texto de um valor gravado no histórico (ZHF_VLANT/ZHF_VLNOV), usado no relatório.
+Função gratificada (RA_XCODFUN): código + descrição da tabela SZA.
+Campo com lista de opções (X3_CBOX): a descrição da opção.
+Demais campos: o próprio valor.
+@type user function
+@author João Victor Guimarães Alves
+@since 30/10/2026
+@param cTipo, character, tipo do histórico
+@param cValor, character, valor gravado
+@param aMapa, array, mapa de ZGPX010M (ler uma vez, fora do laço)
+@return character, texto para exibir
+/*/
+User Function ZGPX010V(cTipo as Character, cValor as Character, aMapa as Array) as Character
+    Local cTexto := AllTrim(cValor) as Character
+    Local cCampo := "" as Character
+    Local cCombo := "" as Character
+    Local cDesc  := "" as Character
+    Local nPos   := 0 as Numeric
+
+    If Empty(cTexto) .Or. Empty(aMapa)
+        Return cTexto
+    EndIf
+
+    nPos := aScan(aMapa, {|x| x[1] == cTipo})
+    If nPos == 0
+        Return cTexto
+    EndIf
+    cCampo := aMapa[nPos][2]
+
+    If cCampo == "RA_XCODFUN"
+        If FWAliasInDic("SZA")
+            cDesc := AllTrim(Posicione("SZA", 1, xFilial("SZA") + PadR(cTexto, TamSX3("ZA_XCODFUN")[1]), "ZA_XDESFUN"))
+        EndIf
+    Else
+        cCombo := AllTrim(GetSX3Cache(cCampo, "X3_CBOX"))
+        If !Empty(cCombo) .And. Left(cCombo, 1) <> "#"
+            cDesc := OpcaoCombo(cCombo, cTexto)
+            If !Empty(cDesc)
+                cTexto := cDesc
+                cDesc  := ""
+            EndIf
+        EndIf
+    EndIf
+
+    If !Empty(cDesc)
+        cTexto := cTexto + " - " + cDesc
+    EndIf
+Return cTexto
+
+/*/{Protheus.doc} DataFuncao
+Data do histórico da função gratificada: na retirada da função usa a data de
+destituição (RA_DTDESTI); na designação ou troca, a data de designação
+(RA_DTDESIG). Se o campo não existir ou estiver vazio, usa a data padrão.
+@type static function
+@author João Victor Guimarães Alves
+@since 30/10/2026
+@param lRetirada, logical, .T. quando o código da função ficou vazio
+@param dPadrao, date, data usada quando não há data no cadastro
+@return date, data do histórico
+/*/
+Static Function DataFuncao(lRetirada as Logical, dPadrao as Date) as Date
+    Local dData  := dPadrao as Date
+    Local cCampo := "RA_DTDESIG" as Character
+    Local nPos   := 0 as Numeric
+
+    If lRetirada
+        cCampo := "RA_DTDESTI"
+    EndIf
+
+    nPos := SRA->(FieldPos(cCampo))
+    If nPos > 0 .And. !Empty(SRA->(FieldGet(nPos)))
+        dData := SRA->(FieldGet(nPos))
+    EndIf
+Return dData
 
 /*/{Protheus.doc} UltimoHist
 Posiciona a ZHF no último histórico de filial + matrícula + tipo.
