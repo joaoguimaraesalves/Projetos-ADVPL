@@ -54,8 +54,9 @@ Static Function ReportDef(aResp as Array) as Object
     TRCell():New(oSecFun, "RA_NOME", "SRA", "Nome",      , TamSX3("RA_NOME")[1] + 4, .F., {|| (cTab)->RA_NOME})
 
     oSecHis := TRSection():New(oSecFun, "Históricos", {"ZHF"})
+    // Célula da data com nome fora do dicionário: com "ZHF_DATA" o TReport usava o tamanho do SX3 (8) e cortava o ano.
     TRCell():New(oSecHis, "TIPO",       "", "Tipo",        , 28, .F., {|| U_ZGPX010T((cTab)->ZHF_TIPO)})
-    TRCell():New(oSecHis, "ZHF_DATA",   "", "Data",        , 12, .F., {|| SToD((cTab)->ZHF_DATA)})
+    TRCell():New(oSecHis, "DATAHIST",   "", "Data",        , 12, .F., {|| DToC(SToD((cTab)->ZHF_DATA))})
     TRCell():New(oSecHis, "SITUACAO",   "", "Situação",    , 20, .F., {|| U_ZGPX010D((cTab)->ZHF_TIPO, (cTab)->ZHF_SITUAC, (cTab)->ZHF_PENAL, (cTab)->ZHF_TPAUX)})
     TRCell():New(oSecHis, "ZHF_DEPEND", "", "Dep.",        , 5,  .F., {|| (cTab)->ZHF_DEPEND})
     TRCell():New(oSecHis, "ZHF_PROCES", "", "Processo",    , 40, .F., {|| (cTab)->ZHF_PROCES})
