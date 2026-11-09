@@ -393,7 +393,10 @@ Static Function ValorTexto(xValor as Variant) as Character
             cTexto := DToC(xValor)
         EndIf
     ElseIf cTipo == "N"
-        cTexto := AllTrim(cValToChar(xValor))
+        // Zero conta como vazio: sem isso todo funcionário ganharia uma linha "0"
+        If xValor <> 0
+            cTexto := AllTrim(cValToChar(xValor))
+        EndIf
     ElseIf cTipo == "L"
         If xValor
             cTexto := "S"
