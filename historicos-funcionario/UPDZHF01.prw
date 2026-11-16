@@ -5,7 +5,7 @@
 #Define HIS_FIL "01"
 
 /*/{Protheus.doc} UPDZHF01
-Compatibilizador do dicionário da v3 dos Históricos do Funcionário:
+Compatibilizador do dicionário da v3 dos Históricos do Funcionário (CAESB):
 - SRA: prazo e datas de início/fim da periculosidade e insalubridade (aba Adicionais);
 - ZHF: auditoria (código, login e matrícula de quem incluiu/alterou, data e hora);
 - ZHG: tabela nova de log de auditoria (campos e índices).
@@ -84,10 +84,11 @@ User Function UPDZHF1X(lSimula as Logical) as Character
     Local cOrdZHF := "" as Character
     Local lZHG    := .F. as Logical
     Local lUser   := .F. as Logical
-    Local aFontes := {"U_CBXHISK", "U_CBXHISW", "U_CBXHISR", "U_CBXHISA", "U_CBGPA21L"} as Array
+    Local aFontes := {"U_CBXHISK", "U_CBXHISW", "U_CBXHISR", "U_CBXHISA", "U_CBGPA21L", "U_CBXHISE"} as Array
     Local nI      := 0 as Numeric
     Local cArq    := "" as Character
     Local aAtuTab := {} as Array
+    Local lIdxInc := .F. as Logical
 
     Default lSimula := .T.
 
@@ -127,6 +128,7 @@ User Function UPDZHF1X(lSimula as Logical) as Character
             aAdd(aFazer, {"CRIAR", aCampos[nI]})
         EndIf
     Next nI
+    lIdxInc := (IdxInc() == 0) // índice 3 da ZHF (ordem de gravação) ainda não existe
     lUser := ExisteCpo("ZHF_USER") .And. AllTrim(Posicione("SX3", 2, PadR("ZHF_USER", 10), "X3_BROWSE")) <> "S"
 
     // Modelos de registro para copiar (X3_USADO/X3_RESERV corretos para campo de usuário)
@@ -142,7 +144,7 @@ User Function UPDZHF1X(lSimula as Logical) as Character
         If PrecisaTab(aFazer, "SRA") .And. !Exclusiva("SRA")
             aAdd(aErros, "A tabela SRA está em uso (usuários, jobs ou serviços). Tire todos do sistema e tente de novo.")
         EndIf
-        If (PrecisaTab(aFazer, "ZHF") .Or. lUser) .And. !Exclusiva("ZHF")
+        If (PrecisaTab(aFazer, "ZHF") .Or. lUser .Or. lIdxInc) .And. !Exclusiva("ZHF")
             aAdd(aErros, "A tabela ZHF está em uso. Tire todos do sistema e tente de novo.")
         EndIf
     EndIf
@@ -160,6 +162,9 @@ User Function UPDZHF1X(lSimula as Logical) as Character
     EndIf
     If !lZHG
         cLog += "CRIAR                 ZHG (tabela) e índices 1 e 2" + CRLF
+    EndIf
+    If lIdxInc
+        cLog += "CRIAR                 ZHF índice Matricula + Dt.Inclusao + Hora (ordem da tela)" + CRLF
     EndIf
 
     If !Empty(aErros)
@@ -191,7 +196,11 @@ User Function UPDZHF1X(lSimula as Logical) as Character
                 cOrdSRA := Soma1(cOrdSRA)
             ElseIf cArq == "ZHF"
                 CriaSX3(aFazer[nI][2], cOrdZHF, "")
-                cLog += "  " + aFazer[nI][2][2] + " criado na ordem " + cOrdZHF + CRLF
+                If AllTrim(aFazer[nI][2][2]) == "ZHF_DESCR"
+                    cLog += "  ZHF_DESCR criado (virtual) na ordem " + AjustaDescr() + ", logo depois do Nome" + CRLF
+                Else
+                    cLog += "  " + aFazer[nI][2][2] + " criado na ordem " + cOrdZHF + CRLF
+                EndIf
                 cOrdZHF := Soma1(cOrdZHF)
             Else
                 CriaSX3(aFazer[nI][2], aFazer[nI][2][13], "")
@@ -209,6 +218,13 @@ User Function UPDZHF1X(lSimula as Logical) as Character
             SX3->X3_BROWSE := "S"
             SX3->(MsUnlock())
             cLog += "  ZHF_USER agora aparece na lista." + CRLF
+        EndIf
+    EndIf
+    If lIdxInc
+        CriaIdxInc()
+        cLog += "  ZHF: índice Matricula + Dt.Inclusao + Hora criado (ordem " + cValToChar(IdxInc()) + ")." + CRLF
+        If aScan(aAtuTab, "ZHF") == 0
+            aAdd(aAtuTab, "ZHF")
         EndIf
     EndIf
 
@@ -242,10 +258,10 @@ Static Function Campos() as Array
     Local cOper := "1=Inclusão;2=Alteração;3=Exclusão" as Character
 
     // SRA - aba Adicionais: Prazo, Início e Fim de cada adicional (nesta ordem)
-    aAdd(aRet, {"SRA", "RA_XPERPRZ", "C", 1, "Prazo Peric.", "Prazo da periculosidade", "@!", 'Pertence(" 12")', cVld, 'U_CBXHISW("RA_XPERPRZ")', cPrz, "N", "", "A"})
+    aAdd(aRet, {"SRA", "RA_XPERPRZ", "C", 1, "Prazo Peric.", "Prazo da periculosidade", "@!", 'Vazio() .Or. Pertence("12")', cVld, 'U_CBXHISW("RA_XPERPRZ")', cPrz, "N", "", "A"})
     aAdd(aRet, {"SRA", "RA_XPERDTI", "D", 8, "Dt Ini Peric", "Inicio periculosidade", "", "", cVld, 'U_CBXHISW("RA_XPERDTI")', "", "N", "", "A"})
     aAdd(aRet, {"SRA", "RA_XPERDTF", "D", 8, "Dt Fim Peric", "Fim periculosidade", "", "", cVld, 'U_CBXHISW("RA_XPERDTF")', "", "N", "", "A"})
-    aAdd(aRet, {"SRA", "RA_XINSPRZ", "C", 1, "Prazo Insal.", "Prazo da insalubridade", "@!", 'Pertence(" 12")', cVld, 'U_CBXHISW("RA_XINSPRZ")', cPrz, "N", "", "A"})
+    aAdd(aRet, {"SRA", "RA_XINSPRZ", "C", 1, "Prazo Insal.", "Prazo da insalubridade", "@!", 'Vazio() .Or. Pertence("12")', cVld, 'U_CBXHISW("RA_XINSPRZ")', cPrz, "N", "", "A"})
     aAdd(aRet, {"SRA", "RA_XINSDTI", "D", 8, "Dt Ini Insal", "Inicio insalubridade", "", "", cVld, 'U_CBXHISW("RA_XINSDTI")', "", "N", "", "A"})
     aAdd(aRet, {"SRA", "RA_XINSDTF", "D", 8, "Dt Fim Insal", "Fim insalubridade", "", "", cVld, 'U_CBXHISW("RA_XINSDTF")', "", "N", "", "A"})
 
@@ -257,6 +273,8 @@ Static Function Campos() as Array
     aAdd(aRet, {"ZHF", "ZHF_MATALT", "C", 6, "Mat.Usr.Alt.", "Matric. usuario alteracao", "", "", "", "", "", "S", "", "V"})
     aAdd(aRet, {"ZHF", "ZHF_DTALT", "D", 8, "Dt.Alteracao", "Data ultima alteracao", "", "", "", "", "", "S", "", "V"})
     aAdd(aRet, {"ZHF", "ZHF_HRALT", "C", 8, "Hr.Alteracao", "Hora ultima alteracao", "", "", "", "", "", "N", "", "V"})
+    // ZHF - coluna Descrição do browse (campo virtual, depois do Nome; 16/11/2026)
+    aAdd(aRet, {"ZHF", "ZHF_DESCR", "C", 60, "Descricao", "Descricao por extenso", "", "", "", "", "", "S", "", "V"})
 
     // ZHG - log de auditoria (tabela nova)
     aAdd(aRet, {"ZHG", "ZHG_FILIAL", "C", Len(xFilial("ZHF")), "Filial", "Filial do Sistema", "", "", "", "", "", "N", "01", "A"})
@@ -305,6 +323,57 @@ Static Function CriaSX3(aCpo as Array, cOrdem as Character, cPasta as Character)
     CopiaReg("SX3", nRecMod, aTroca)
 Return
 
+/*/{Protheus.doc} AjustaDescr
+Deixa o ZHF_DESCR como campo virtual só de browse (Inic. Browse U_CBXHISE()) e o
+posiciona logo depois do ZHF_NOME, empurrando uma ordem os campos seguintes.
+@type static function
+@author João Victor Guimarães Alves
+@since 16/11/2026
+@return character, ordem final do ZHF_DESCR
+/*/
+Static Function AjustaDescr() as Character
+    Local nRecDsc := RecCampo("ZHF_DESCR") as Numeric
+    Local cOrdNom := "" as Character
+    Local aRecs   := {} as Array
+    Local nI      := 0 as Numeric
+
+    If nRecDsc == 0
+        Return ""
+    EndIf
+    SX3->(DbSetOrder(2))
+    If SX3->(DbSeek(PadR("ZHF_NOME", 10)))
+        cOrdNom := SX3->X3_ORDEM
+    EndIf
+
+    // Campos depois do Nome (guarda os recnos antes de mexer na ordem do índice)
+    If !Empty(cOrdNom)
+        SX3->(DbSetOrder(1))
+        SX3->(DbSeek("ZHF"))
+        While !SX3->(Eof()) .And. SX3->X3_ARQUIVO == "ZHF"
+            If SX3->X3_ORDEM > cOrdNom .And. SX3->(Recno()) <> nRecDsc
+                aAdd(aRecs, SX3->(Recno()))
+            EndIf
+            SX3->(DbSkip())
+        EndDo
+        For nI := 1 To Len(aRecs)
+            SX3->(DbGoTo(aRecs[nI]))
+            RecLock("SX3", .F.)
+            SX3->X3_ORDEM := Soma1(SX3->X3_ORDEM)
+            SX3->(MsUnlock())
+        Next nI
+    EndIf
+
+    SX3->(DbGoTo(nRecDsc))
+    RecLock("SX3", .F.)
+    SX3->X3_CONTEXT := "V"
+    SX3->X3_INIBRW  := "U_CBXHISE()"
+    SX3->X3_RELACAO := ""
+    If !Empty(cOrdNom)
+        SX3->X3_ORDEM := Soma1(cOrdNom)
+    EndIf
+    SX3->(MsUnlock())
+Return SX3->X3_ORDEM
+
 /*/{Protheus.doc} CriaSX2ZHG
 Cria a ZHG no SX2 copiando a ZHF (mesmo modo de compartilhamento).
 @type static function
@@ -320,6 +389,56 @@ Static Function CriaSX2ZHG()
         {"X2_NOME", "Auditoria Historicos Func."}, {"X2_NOMESPA", "Auditoria Historicos Func."}, ;
         {"X2_NOMEENG", "Employee History Audit"}, {"X2_UNICO", ""}, {"X2_ROTINA", ""}, ;
         {"X2_DISPLAY", ""}, {"X2_SYSOBJ", ""}, {"X2_USROBJ", ""}})
+Return
+
+/*/{Protheus.doc} IdxInc
+Número do índice da ZHF pela data/hora de gravação (0 quando não existe).
+@type static function
+@author João Victor Guimarães Alves
+@since 16/11/2026
+@return numeric, número do índice
+/*/
+Static Function IdxInc() as Numeric
+    Local nOrd  := 0 as Numeric
+    Local nCont := 0 as Numeric
+    Local aArea := SIX->(GetArea()) as Array
+
+    SIX->(DbSetOrder(1))
+    SIX->(DbSeek("ZHF"))
+    While !SIX->(Eof()) .And. AllTrim(SIX->INDICE) == "ZHF"
+        nCont++
+        If "ZHF_DTINC" $ Upper(SIX->CHAVE)
+            nOrd := nCont
+            Exit
+        EndIf
+        SIX->(DbSkip())
+    EndDo
+    RestArea(aArea)
+Return nOrd
+
+/*/{Protheus.doc} CriaIdxInc
+Cria na ZHF o índice ZHF_FILIAL+ZHF_MAT+DTOS(ZHF_DTINC)+ZHF_HRINC (a tela de
+Históricos abre nessa ordem: a alteração mais recente fica por último), na
+próxima ordem livre, copiando o índice 1.
+@type static function
+@author João Victor Guimarães Alves
+@since 16/11/2026
+/*/
+Static Function CriaIdxInc()
+    Local nRec   := 0 as Numeric
+    Local cOrdem := "1" as Character
+
+    SIX->(DbSetOrder(1))
+    SIX->(DbSeek("ZHF"))
+    nRec := SIX->(Recno())
+    While !SIX->(Eof()) .And. AllTrim(SIX->INDICE) == "ZHF"
+        cOrdem := Soma1(AllTrim(SIX->ORDEM))
+        SIX->(DbSkip())
+    EndDo
+    CopiaReg("SIX", nRec, { ;
+        {"ORDEM", cOrdem}, {"CHAVE", "ZHF_FILIAL+ZHF_MAT+DTOS(ZHF_DTINC)+ZHF_HRINC"}, ;
+        {"DESCRICAO", "Matricula + Dt.Inclusao + Hora"}, {"DESCSPA", "Matricula + Dt.Inclusao + Hora"}, ;
+        {"DESCENG", "Matricula + Dt.Inclusao + Hora"}, {"NICKNAME", ""}, {"F3", ""}, {"SHOWPESQ", "S"}, {"PROPRI", "U"}})
 Return
 
 /*/{Protheus.doc} CriaSIXZHG

@@ -16,12 +16,12 @@ Os nomes seguem o padrão do ambiente do cliente (`CBGPE` + tipo + número, tudo
 
 | Fonte | Tipo | O que faz |
 |---|---|---|
-| [`CBGPEX01.prw`](CBGPEX01.prw) | Funções de apoio | Base do projeto, usada pelos outros fontes (funções `U_CBXHIS*`). Lista os 13 tipos de histórico (`U_CBXHISC`, combo do `ZHF_TIPO`), inicializadores, próxima sequência e o mapa de campos monitorados (`MV_ZHFCPOS`). A função principal é `U_CBXHISG`: compara os campos monitorados do funcionário com o último histórico de cada tipo, pede Data Inicial/Final/Processo quando há tela e grava a linha nova; também acerta a Data Final quando só o prazo do adicional muda. Traz o bloqueio de prazo/datas do adicional (`U_CBXHISW`, `U_CBXHISK`), a auditoria (`U_CBXHISA`) e o texto dos valores para tela e relatório (`U_CBXHISV`). |
-| [`CBGPEA21.prw`](CBGPEA21.prw) | Tela MVC | Cadastro dos históricos (browse + formulário). `U_CBGPEA21` abre com todos os funcionários; `U_CBGPA21F` abre filtrada no funcionário posicionado (opção "Históricos" do cadastro). Mostra o valor anterior/novo também por extenso (ex.: `1 - 50/50`). Outras Ações: Auditoria, Legenda, Relatório e Carga inicial. Linhas automáticas não podem ser excluídas. |
-| [`CBGPER20.prw`](CBGPER20.prw) | Relatório (TReport) | Relatório por faixa de matrícula, tipo e período, em paisagem, com origem, situação, valores em texto e quem incluiu/alterou. |
+| [`CBGPEX01.prw`](CBGPEX01.prw) | Funções de apoio | Base do projeto, usada pelos outros fontes (funções `U_CBXHIS*`). Lista os 13 tipos de histórico (`U_CBXHISC`, combo do `ZHF_TIPO`), inicializadores, próxima sequência e o mapa de campos monitorados (`MV_ZHFCPOS`). A função principal é `U_CBXHISG`: compara os campos monitorados do funcionário com o último histórico de cada tipo, pede Data Inicial/Final/Processo quando há tela e grava a linha nova; também acerta a Data Final quando só o prazo do adicional muda. `U_CBXHISG` também aceita uma data fixa e um motivo (`U_CBXHISG(cOrigem, aMapa, dData, cMotivo)`), para ser chamada por outras rotinas, como as de transferência, sem abrir a janela de datas. Traz o bloqueio de prazo/datas do adicional (`U_CBXHISW`, `U_CBXHISK`), a auditoria (`U_CBXHISA`), o texto dos valores para tela e relatório (`U_CBXHISV`) e a descrição por extenso da linha para a coluna Descrição do browse (`U_CBXHISE`). |
+| [`CBGPEA21.prw`](CBGPEA21.prw) | Tela MVC | Cadastro dos históricos (browse + formulário). `U_CBGPEA21` abre com todos os funcionários; `U_CBGPA21F` abre filtrada no funcionário posicionado (opção "Históricos" do cadastro). Mostra o valor anterior/novo também por extenso (ex.: `1 - 50/50`). O browse tem a coluna **Descrição** (valor novo por extenso ou a situação/penalidade) e abre na **ordem de gravação** (a alteração mais recente por último) quando existe o índice por data/hora de inclusão. Outras Ações: Auditoria, Legenda, Relatório e Carga inicial. Linhas automáticas não podem ser excluídas. |
+| [`CBGPER20.prw`](CBGPER20.prw) | Relatório (TReport) | Relatório por faixa de matrícula, tipo e período (pela Data Inicial; data final em branco = sem limite), em paisagem, com origem, situação, valores em texto e quem incluiu/alterou. |
 | [`CBGPEM13.prw`](CBGPEM13.prw) | Rotina de carga | Carga inicial: grava o valor atual dos campos monitorados de todos os funcionários não demitidos da filial que ainda não têm histórico daquele tipo. `U_CBGPEM13` com tela; `U_CBGPM13J` sem interface (job/Schedule). |
 | [`UPDZHF00.prw`](UPDZHF00.prw) | Compatibilizador | Cria a tabela ZHF (SX2, SX3, SIX e o gatilho da matrícula) e a tabela física. Tem modo Simular; não grava nada se encontrar inconsistência. |
-| [`UPDZHF01.prw`](UPDZHF01.prw) | Compatibilizador | Campos da v3: prazo e datas dos adicionais na aba Adicionais da SRA, campos de auditoria na ZHF e a tabela ZHG. Também com modo Simular. |
+| [`UPDZHF01.prw`](UPDZHF01.prw) | Compatibilizador | Campos da v3: prazo e datas dos adicionais na aba Adicionais da SRA (prazo opcional: `Vazio() .Or. Pertence("12")`), campos de auditoria na ZHF, a tabela ZHG, o campo virtual `ZHF_DESCR` (coluna Descrição, logo depois do Nome) e o índice por data/hora de inclusão. Também com modo Simular. |
 | [`GPE10OPC.prw`](GPE10OPC.prw) | Ponto de entrada | Opção **"Históricos"** na MenuDef do Cadastro de Funcionários (GPEA010); aparece em Privilégios. |
 | [`GP011MEN.prw`](GP011MEN.prw) | Ponto de entrada | Mesma opção na **Gestão de Funcionários** (GPEA011). |
 | [`GPE10MENU.prw`](GPE10MENU.prw) | Ponto de entrada | Opção "Históricos" para ambientes cujo GPEA010 não chama o GPE10OPC; não duplica. |
@@ -31,13 +31,23 @@ Se o ambiente já tiver algum desses pontos de entrada, juntar o trecho deste pr
 
 ## Dicionário
 
-**ZHF** (25 campos): filial, matrícula, nome, tipo, sequência, Data Inicial, Data Final, situação, penalidade, tipo de auxílio, dependente, processo, valor anterior, valor novo, origem (1 = manual, 2 = automática, 3 = carga) e auditoria (usuário, código e matrícula de quem incluiu e de quem alterou, datas e horas). Índices `ZHF_FILIAL + ZHF_MAT + ZHF_TIPO + ZHF_SEQ` e `ZHF_FILIAL + ZHF_TIPO + DTOS(ZHF_DATA)`.
+**ZHF** (25 campos + o virtual `ZHF_DESCR`): filial, matrícula, nome, tipo, sequência, Data Inicial, Data Final, situação, penalidade, tipo de auxílio, dependente, processo, valor anterior, valor novo, origem (1 = manual, 2 = automática, 3 = carga) e auditoria (usuário, código e matrícula de quem incluiu e de quem alterou, datas e horas). Índices `ZHF_FILIAL + ZHF_MAT + ZHF_TIPO + ZHF_SEQ`, `ZHF_FILIAL + ZHF_TIPO + DTOS(ZHF_DATA)` e `ZHF_FILIAL + ZHF_MAT + DTOS(ZHF_DTINC) + ZHF_HRINC` (ordem da tela).
 
 **ZHG**: log de auditoria (operação, usuário, data, hora, rotina e detalhe).
 
 **SRA** (aba Adicionais): `RA_XPERPRZ`, `RA_XPERDTI`, `RA_XPERDTF`, `RA_XINSPRZ`, `RA_XINSDTI`, `RA_XINSDTF`.
 
 Parâmetros opcionais (o padrão está no fonte): `MV_ZHFCPOS` = `01=RA_XCODFUN;05=RA_ADCPERI;06=RA_ADCINS;07=RA_XPERELE;10=RA_XOPTICK` e `MV_ZHFDTS` = `05=RA_XPERDTI,RA_XPERDTF,RA_XPERPRZ;06=RA_XINSDTI,RA_XINSDTF,RA_XINSPRZ`.
+
+## Integração com outras rotinas
+
+Rotinas que alteram os campos monitorados fora do Cadastro de Funcionários (por exemplo, transferências que retiram a periculosidade ou a insalubridade) podem gravar o histórico chamando, depois de gravar a SRA:
+
+```
+U_CBXHISG("2", Nil, dDataTransf, "Transferência de local de trabalho")
+```
+
+O histórico anterior recebe a Data Final igual à data informada e a linha nova começa nessa data. Envolver a chamada em `Begin Sequence`/`ErrorBlock`, para que uma falha no histórico só vá para o log.
 
 ## Como instalar
 

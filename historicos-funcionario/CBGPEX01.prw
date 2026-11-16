@@ -10,6 +10,9 @@
 // por tipo de histórico (v3, 11/11/2026). O 3º campo (prazo) é opcional.
 #Define HIS_MAPDT   "05=RA_XPERDTI,RA_XPERDTF,RA_XPERPRZ;06=RA_XINSDTI,RA_XINSDTF,RA_XINSPRZ"
 
+// Cache do mapa tipo x campo para a coluna Descrição do browse (U_CBXHISE)
+Static aMapaDesc := Nil
+
 /*/{Protheus.doc} CBXHISC
 Lista de opções do campo ZHF_TIPO (usada no X3_CBOX como #U_CBXHISC()).
 @type user function
@@ -155,9 +158,12 @@ log de auditoria (ZHG).
 @since 29/10/2026
 @param cOrigem, character, "2" = automática (cadastro), "3" = carga inicial
 @param aMapa, array, mapa de CBXHISM (opcional; lido do parâmetro se vazio)
+@param dDataFix, date, data informada pela rotina chamadora (opcional; ex.: data da
+transferência). Com ela não abre a janela de datas e o histórico usa essa data (16/11/2026).
+@param cMotivo, character, texto da auditoria (opcional; ex.: "Transferência de local de trabalho")
 @return numeric, quantidade de linhas gravadas
 /*/
-User Function CBXHISG(cOrigem as Character, aMapa as Array) as Numeric
+User Function CBXHISG(cOrigem as Character, aMapa as Array, dDataFix as Date, cMotivo as Character) as Numeric
     Local nGrav    := 0 as Numeric
     Local nI       := 0 as Numeric
     Local nPos     := 0 as Numeric
@@ -195,7 +201,7 @@ User Function CBXHISG(cOrigem as Character, aMapa as Array) as Numeric
 
     cFilZHF := xFilial("ZHF", SRA->RA_FILIAL)
     cMat    := SRA->RA_MAT
-    lTela   := (cOrigem == "2" .And. TemTela())
+    lTela   := (cOrigem == "2" .And. Empty(dDataFix) .And. TemTela())
 
     // Adicional 1=Não: prazo e datas dele não valem e são limpos no cadastro
     If cOrigem == "2"
@@ -256,6 +262,11 @@ User Function CBXHISG(cOrigem as Character, aMapa as Array) as Numeric
             EndIf
             dFimSug := aDtSRA[2]
         EndIf
+        // Data informada pela rotina chamadora (ex.: data da transferência)
+        If !Empty(dDataFix)
+            dData   := dDataFix
+            dFimSug := CToD("")
+        EndIf
 
         aAdd(aMuda, {cTipo, cSeq, cAnt, cValor, dData, dFimSug})
     Next nI
@@ -295,7 +306,7 @@ User Function CBXHISG(cOrigem as Character, aMapa as Array) as Numeric
         GravaCampo("ZHF_MATINC", aUsr[3])
         ZHF->(MsUnlock())
 
-        cDet := IIf(cOrigem == "3", "Carga inicial. ", "Alteração no cadastro do funcionário. ") + ;
+        cDet := IIf(cOrigem == "3", "Carga inicial. ", IIf(Empty(cMotivo), "Alteração no cadastro do funcionário. ", AllTrim(cMotivo) + ". ")) + ;
             "Valor: " + IIf(Empty(cAnt), "vazio", cAnt) + " -> " + IIf(Empty(cValor), "vazio", cValor) + ;
             ". Data Inicial " + U_CBXHISB(dData) + IIf(Empty(dFim), "", ", Data Final " + U_CBXHISB(dFim)) + ;
             IIf(Empty(cProc), "", ", Processo " + cProc)
@@ -325,7 +336,7 @@ Return nGrav
 
 /*/{Protheus.doc} CBXHISF
 Fecha o histórico anterior do mesmo tipo: quando a Data Final dele está vazia,
-recebe a Data Inicial do histórico novo (pedido do cliente em 10/11/2026).
+recebe a Data Inicial do histórico novo (pedido da CAESB em 10/11/2026).
 Não mexe se o anterior já tem Data Final ou começa depois do novo.
 @type user function
 @author João Victor Guimarães Alves
@@ -477,6 +488,42 @@ User Function CBXHISD(cTipo as Character, cSituac as Character, cPenal as Charac
         cDesc := OpcaoCombo("1=Sim;2=Não", cSituac)
     EndIf
 Return cDesc
+
+/*/{Protheus.doc} CBXHISE
+Descrição por extenso da linha posicionada da ZHF, para a coluna "Descrição" do
+browse (inicializador de browse do campo virtual ZHF_DESCR): valor novo com a
+descrição (ex.: Ticket "1 - 100 A", função "código - descrição") ou, nos tipos sem
+valor, a situação/penalidade/tipo de auxílio (ex.: "Sim", "Advertência").
+@type user function
+@author João Victor Guimarães Alves
+@since 16/11/2026
+@param aMapa, array, mapa tipo x campo (U_CBXHISM); opcional
+@return character, descrição
+/*/
+User Function CBXHISE(aMapa as Array) as Character
+    Local cValor := "" as Character
+    Local cTexto := "" as Character
+
+    If ZHF->(Eof())
+        Return cTexto
+    EndIf
+    If Empty(aMapa)
+        If aMapaDesc == Nil
+            aMapaDesc := U_CBXHISM()
+        EndIf
+        aMapa := aMapaDesc
+    EndIf
+
+    cValor := AllTrim(ZHF->ZHF_VLNOV)
+    If !Empty(cValor)
+        cTexto := AllTrim(U_CBXHISV(ZHF->ZHF_TIPO, cValor, aMapa))
+        If !(cTexto == cValor) .And. !(Left(cTexto, Len(cValor) + 1) == cValor + " ")
+            cTexto := cValor + " - " + cTexto
+        EndIf
+    Else
+        cTexto := AllTrim(U_CBXHISD(ZHF->ZHF_TIPO, ZHF->ZHF_SITUAC, ZHF->ZHF_PENAL, ZHF->ZHF_TPAUX))
+    EndIf
+Return cTexto
 
 /*/{Protheus.doc} CBXHISL
 Indica se o tipo usa o campo Sim/Não, Penalidade, Auxílio ou Valor.
@@ -869,7 +916,7 @@ Return lRet
 /*/{Protheus.doc} CBXHISW
 Modo de edição (X3_WHEN) do prazo e das datas do adicional no Cadastro de Funcionários.
 Prazo: liberado só quando o funcionário tem o adicional (RA_ADCPERI/RA_ADCINS diferente
-de 1=Não; decisão do cliente em 13/11/2026). Datas: adicional ativo e prazo 2=Determinado.
+de 1=Não; decisão da CAESB em 13/11/2026). Datas: adicional ativo e prazo 2=Determinado.
 Sem o campo de prazo no dicionário, as datas dependem só do adicional.
 @type user function
 @author João Victor Guimarães Alves
@@ -927,7 +974,7 @@ Return IIf(nPos > 0, aMapa[nPos][2], "")
 
 /*/{Protheus.doc} LimpaInativo
 Depois de salvar o funcionário: se o adicional ficou 1=Não, limpa prazo e datas
-dele na SRA (não valem sem o adicional; decisão do cliente em 13/11/2026).
+dele na SRA (não valem sem o adicional; decisão da CAESB em 13/11/2026).
 @type static function
 @author João Victor Guimarães Alves
 @since 13/11/2026

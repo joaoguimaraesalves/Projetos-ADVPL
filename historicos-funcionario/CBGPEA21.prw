@@ -61,6 +61,13 @@ Monta o browse da ZHF.
 /*/
 Static Function MntBrowse(cFiltro as Character) as Object
     Local oBrowse := Nil as Object
+    Local nOrdInc := 0 as Numeric
+
+    // Abre na ordem de gravação (alteração mais recente por último), quando o índice existe
+    nOrdInc := OrdemInc()
+    If nOrdInc > 0
+        ZHF->(DbSetOrder(nOrdInc))
+    EndIf
 
     oBrowse := FWMBrowse():New()
     oBrowse:SetAlias("ZHF")
@@ -70,10 +77,71 @@ Static Function MntBrowse(cFiltro as Character) as Object
     oBrowse:AddLegend("ZHF_ORIGEM == '2'", "BLUE",   "Automática (cadastro)")
     oBrowse:AddLegend("ZHF_ORIGEM == '3'", "YELLOW", "Carga inicial")
 
+    // Coluna com a descrição por extenso (pedido da CAESB 16/11/2026). Quando o campo
+    // virtual ZHF_DESCR existe no dicionário, ele já aparece na posição certa (depois
+    // do Tipo); sem ele, a coluna é incluída aqui (fica no começo da lista).
+    If Empty(GetSX3Cache("ZHF_DESCR", "X3_CAMPO"))
+        oBrowse:SetColumns({ColDescr()})
+    EndIf
     If !Empty(cFiltro)
         oBrowse:SetFilterDefault(cFiltro)
     EndIf
 Return oBrowse
+
+/*/{Protheus.doc} OrdemInc
+Número do índice da ZHF por data/hora de gravação
+(ZHF_FILIAL+ZHF_MAT+DTOS(ZHF_DTINC)+ZHF_HRINC); 0 quando não existe.
+@type static function
+@author João Victor Guimarães Alves
+@since 16/11/2026
+@return numeric, número do índice
+/*/
+Static Function OrdemInc() as Numeric
+    Local nOrd  := 0 as Numeric
+    Local nCont := 0 as Numeric
+    Local aArea := SIX->(GetArea()) as Array
+
+    SIX->(DbSetOrder(1))
+    SIX->(DbSeek("ZHF"))
+    While !SIX->(Eof()) .And. AllTrim(SIX->INDICE) == "ZHF"
+        nCont++
+        If "ZHF_DTINC" $ Upper(SIX->CHAVE)
+            nOrd := nCont
+            Exit
+        EndIf
+        SIX->(DbSkip())
+    EndDo
+    RestArea(aArea)
+Return nOrd
+
+/*/{Protheus.doc} ColDescr
+Coluna "Descrição" do browse: valor novo do histórico por extenso (descrição da
+opção do campo, da função gratificada etc.), igual ao campo "Valor novo (texto)".
+@type static function
+@author João Victor Guimarães Alves
+@since 16/11/2026
+@return object, FWBrwColumn
+/*/
+Static Function ColDescr() as Object
+    Local oCol  := FWBrwColumn():New() as Object
+    Local aMapa := U_CBXHISM() as Array
+
+    oCol:SetTitle("Descrição")
+    oCol:SetType("C")
+    oCol:SetSize(40)
+    oCol:SetData({|| DescrBrw(aMapa)})
+Return oCol
+
+/*/{Protheus.doc} DescrBrw
+Texto da coluna "Descrição" para a linha posicionada da ZHF.
+@type static function
+@author João Victor Guimarães Alves
+@since 16/11/2026
+@param aMapa, array, mapa tipo x campo (U_CBXHISM)
+@return character, valor novo por extenso
+/*/
+Static Function DescrBrw(aMapa as Array) as Character
+Return U_CBXHISE(aMapa)
 
 /*/{Protheus.doc} MenuDef
 Opções do browse de históricos.
@@ -126,6 +194,9 @@ Static Function ModelDef() as Object
     Local nI      := 0 as Numeric
 
     oStruct := FWFormStruct(1, "ZHF")
+    If oStruct:HasField("ZHF_DESCR")
+        oStruct:RemoveField("ZHF_DESCR") // campo só do browse
+    EndIf
 
     // Campos que abrem conforme o tipo e a origem da linha
     aWhen := {"ZHF_MAT", "ZHF_TIPO", "ZHF_DATA", "ZHF_DTFIM", "ZHF_SITUAC", "ZHF_PENAL", "ZHF_TPAUX", "ZHF_DEPEND", "ZHF_PROCES", "ZHF_VLNOV"}
@@ -136,7 +207,7 @@ Static Function ModelDef() as Object
     // Matrícula precisa existir na SRA (validação no modelo, sem variável de memória)
     oStruct:SetProperty("ZHF_MAT", MODEL_FIELD_VALID, {|oMdl, cFld, xVal| ExistCpo("SRA", xVal)})
 
-    // Data Inicial obrigatória; Data Final e Processo opcionais (cliente, 10/11/2026)
+    // Data Inicial obrigatória; Data Final e Processo opcionais (CAESB, 10/11/2026)
     oStruct:SetProperty("ZHF_DATA", MODEL_FIELD_OBRIGAT, .T.)
     oStruct:SetProperty("ZHF_DTFIM", MODEL_FIELD_VALID, {|oMdl, cFld, xVal| DataFimOk(oMdl, xVal)})
 
@@ -176,6 +247,9 @@ Static Function ViewDef() as Object
 
     oModel  := FWLoadModel("CBGPEA21")
     oStruct := FWFormStruct(2, "ZHF")
+    If oStruct:HasField("ZHF_DESCR")
+        oStruct:RemoveField("ZHF_DESCR") // campo só do browse
+    EndIf
 
     oStruct:AddField("ZHF_DSCANT", OrdemApos(oStruct, "ZHF_VLANT"), "Valor ant. (texto)", "Valor anterior por extenso", Nil, "C", "", Nil, "", .F., Nil, Nil, Nil, Nil, Nil, .T.)
     oStruct:AddField("ZHF_DSCNOV", OrdemApos(oStruct, "ZHF_VLNOV"), "Valor novo (texto)", "Valor novo por extenso", Nil, "C", "", Nil, "", .F., Nil, Nil, Nil, Nil, Nil, .T.)
@@ -578,7 +652,7 @@ Static Function TxtValor(oMdl as Variant, cCampo as Character) as Character
     EndIf
 
     cTexto := AllTrim(U_CBXHISV(ZHF->ZHF_TIPO, cValor, U_CBXHISM()))
-    If !(Left(cTexto, Len(cValor)) == cValor)
+    If !(cTexto == cValor) .And. !(Left(cTexto, Len(cValor) + 1) == cValor + " ")
         cTexto := cValor + " - " + cTexto
     EndIf
 Return cTexto

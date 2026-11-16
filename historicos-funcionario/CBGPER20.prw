@@ -20,7 +20,7 @@ User Function CBGPER20()
     aAdd(aPergs, {1, "Matrícula até", Replicate("Z", nTamMat),     "", "", "SRA", "", 50, .F.})
     aAdd(aPergs, {2, "Tipo",          1, aTipos, 120, ".T.", .T.})
     aAdd(aPergs, {1, "Data de",       CToD(""),                    "", "", "",    "", 50, .F.})
-    aAdd(aPergs, {1, "Data até",      dDataBase,                   "", "", "",    "", 50, .F.})
+    aAdd(aPergs, {1, "Data até",      CToD(""),                    "", "", "",    "", 50, .F.})
 
     If !ParamBox(aPergs, "Históricos do Funcionário", @aResp, , , , , , , , .F., .F.)
         Return
