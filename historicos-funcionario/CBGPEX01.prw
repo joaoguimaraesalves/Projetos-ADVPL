@@ -336,7 +336,7 @@ Return nGrav
 
 /*/{Protheus.doc} CBXHISF
 Fecha o histórico anterior do mesmo tipo: quando a Data Final dele está vazia,
-recebe a Data Inicial do histórico novo (pedido da CAESB em 10/11/2026).
+recebe a Data Inicial do histórico novo (pedido do cliente em 10/11/2026).
 Não mexe se o anterior já tem Data Final ou começa depois do novo.
 @type user function
 @author João Victor Guimarães Alves
@@ -916,7 +916,7 @@ Return lRet
 /*/{Protheus.doc} CBXHISW
 Modo de edição (X3_WHEN) do prazo e das datas do adicional no Cadastro de Funcionários.
 Prazo: liberado só quando o funcionário tem o adicional (RA_ADCPERI/RA_ADCINS diferente
-de 1=Não; decisão da CAESB em 13/11/2026). Datas: adicional ativo e prazo 2=Determinado.
+de 1=Não; decisão do cliente em 13/11/2026). Datas: adicional ativo e prazo 2=Determinado.
 Sem o campo de prazo no dicionário, as datas dependem só do adicional.
 @type user function
 @author João Victor Guimarães Alves
@@ -974,7 +974,7 @@ Return IIf(nPos > 0, aMapa[nPos][2], "")
 
 /*/{Protheus.doc} LimpaInativo
 Depois de salvar o funcionário: se o adicional ficou 1=Não, limpa prazo e datas
-dele na SRA (não valem sem o adicional; decisão da CAESB em 13/11/2026).
+dele na SRA (não valem sem o adicional; decisão do cliente em 13/11/2026).
 @type static function
 @author João Victor Guimarães Alves
 @since 13/11/2026

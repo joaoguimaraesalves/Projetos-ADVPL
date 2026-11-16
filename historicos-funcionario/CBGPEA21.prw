@@ -77,7 +77,7 @@ Static Function MntBrowse(cFiltro as Character) as Object
     oBrowse:AddLegend("ZHF_ORIGEM == '2'", "BLUE",   "Automática (cadastro)")
     oBrowse:AddLegend("ZHF_ORIGEM == '3'", "YELLOW", "Carga inicial")
 
-    // Coluna com a descrição por extenso (pedido da CAESB 16/11/2026). Quando o campo
+    // Coluna com a descrição por extenso (pedido do cliente 16/11/2026). Quando o campo
     // virtual ZHF_DESCR existe no dicionário, ele já aparece na posição certa (depois
     // do Tipo); sem ele, a coluna é incluída aqui (fica no começo da lista).
     If Empty(GetSX3Cache("ZHF_DESCR", "X3_CAMPO"))
@@ -207,7 +207,7 @@ Static Function ModelDef() as Object
     // Matrícula precisa existir na SRA (validação no modelo, sem variável de memória)
     oStruct:SetProperty("ZHF_MAT", MODEL_FIELD_VALID, {|oMdl, cFld, xVal| ExistCpo("SRA", xVal)})
 
-    // Data Inicial obrigatória; Data Final e Processo opcionais (CAESB, 10/11/2026)
+    // Data Inicial obrigatória; Data Final e Processo opcionais (cliente, 10/11/2026)
     oStruct:SetProperty("ZHF_DATA", MODEL_FIELD_OBRIGAT, .T.)
     oStruct:SetProperty("ZHF_DTFIM", MODEL_FIELD_VALID, {|oMdl, cFld, xVal| DataFimOk(oMdl, xVal)})
 

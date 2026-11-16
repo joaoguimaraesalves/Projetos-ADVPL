@@ -5,7 +5,7 @@
 #Define HIS_FIL "01"
 
 /*/{Protheus.doc} UPDZHF01
-Compatibilizador do dicionário da v3 dos Históricos do Funcionário (CAESB):
+Compatibilizador do dicionário da v3 dos Históricos do Funcionário:
 - SRA: prazo e datas de início/fim da periculosidade e insalubridade (aba Adicionais);
 - ZHF: auditoria (código, login e matrícula de quem incluiu/alterou, data e hora);
 - ZHG: tabela nova de log de auditoria (campos e índices).
