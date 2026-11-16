@@ -13,8 +13,8 @@ Documentação: https://tdn.totvs.com/pages/releaseview.action?pageId=6079250
 /*/
 User Function GPE10MENU()
     If Type("aRotina") == "A"
-        If aScan(aRotina, {|x| ValType(x[2]) == "C" .And. Upper(AllTrim(x[2])) == "U_ZGPA010F"}) == 0
-            aAdd(aRotina, {"Históricos", "U_ZGPA010F", 0, 7, 0, Nil})
+        If aScan(aRotina, {|x| ValType(x[2]) == "C" .And. Upper(AllTrim(x[2])) == "U_CBGPA21F"}) == 0
+            aAdd(aRotina, {"Históricos", "U_CBGPA21F", 0, 7, 0, Nil})
         EndIf
     EndIf
 Return Nil

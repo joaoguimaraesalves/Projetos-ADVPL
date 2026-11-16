@@ -1,4 +1,3 @@
-#include "tlpp-core.th"
 #include "totvs.ch"
 
 /*/{Protheus.doc} GPE10OPC
@@ -16,5 +15,5 @@ Documentação: https://tdn.totvs.com/pages/releaseview.action?pageId=1021200371
 User Function GPE10OPC() as Array
     Local aNewOpc := {} as Array
 
-    aAdd(aNewOpc, {"Históricos", "U_ZGPA010F", 0, 7, 0, Nil})
+    aAdd(aNewOpc, {"Históricos", "U_CBGPA21F", 0, 7, 0, Nil})
 Return aNewOpc

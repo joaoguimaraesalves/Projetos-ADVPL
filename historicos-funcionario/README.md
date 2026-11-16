@@ -4,55 +4,45 @@ Customização do módulo **Gestão de Pessoal** que guarda, numa tabela própri
 
 O histórico é gravado de três jeitos:
 
-- **Manual**: pela tela de Históricos, aberta pelo Cadastro de Funcionários ou direto pela rotina.
-- **Automático**: ao salvar o Cadastro de Funcionários, os campos monitorados que mudaram viram uma linha nova.
-- **Carga inicial**: grava a situação atual de todos os funcionários, uma vez por filial.
+- **Manual**: pela tela de Históricos (legenda verde).
+- **Automático**: ao salvar o Cadastro ou a Gestão de Funcionários, os campos monitorados que mudaram viram uma linha nova (legenda azul). O histórico novo fecha o anterior do mesmo tipo (Data Final).
+- **Carga inicial**: grava a situação atual de todos os funcionários, uma vez por filial (legenda amarela).
 
-Ambiente de desenvolvimento: Protheus 12.1.2510.
+Cada histórico tem **Data Inicial, Data Final e Processo**, e toda inclusão, alteração ou exclusão fica registrada na tabela de auditoria **ZHG** (quem, quando e o que mudou). Na aba **Adicionais** do cadastro entram o prazo e as datas de início e fim da periculosidade e da insalubridade, que só abrem quando o funcionário tem o adicional.
+
+Os nomes seguem o padrão do ambiente do cliente (`CBGPE` + tipo + número, tudo em `.prw`). Ambiente de desenvolvimento: Protheus 12.1.2510.
 
 ## Fontes
 
 | Fonte | Tipo | O que faz |
 |---|---|---|
-| [`ZGPX010.tlpp`](ZGPX010.tlpp) | Funções de apoio | Base do projeto, usada pelos outros fontes. Lista os 13 tipos de histórico (`U_ZGPX010C`, usada no combo do campo `ZHF_TIPO`) e a descrição de cada tipo (`U_ZGPX010T`). Traz os inicializadores da matrícula e do nome (`U_ZGPX010I`, `U_ZGPX010N`) e calcula a próxima sequência (`U_ZGPX010S`). Lê o parâmetro `MV_ZHFCPOS`, que liga cada tipo a um campo da SRA (`U_ZGPX010M`). A função principal é `U_ZGPX010G`: compara os campos monitorados do funcionário com o último histórico de cada tipo e grava uma linha nova quando o valor mudou. Não usa interface, então pode rodar dentro da gravação do cadastro. Na função gratificada, a data do histórico é a de designação (`RA_DTDESIG`) ou, quando a função é retirada, a de destituição (`RA_DTDESTI`). `U_ZGPX010V` transforma o valor gravado em texto para o relatório: código + descrição da função (tabela SZA) ou a descrição da opção do campo (ex.: "Sim", "Insalubridade Média"). |
-| [`ZGPA010.prw`](ZGPA010.prw) | Tela MVC | Cadastro dos históricos (browse + formulário). `U_ZGPA010` abre com todos os funcionários. `U_ZGPA010F` abre filtrada no funcionário posicionado (chamada pela opção "Históricos" do Cadastro de Funcionários). `U_ZGPA010W` libera ou bloqueia cada campo conforme o tipo escolhido. Feita em AdvPL (`.prw`) porque MVC em TLPP exige namespace. |
-| [`ZGPR010.tlpp`](ZGPR010.tlpp) | Relatório (TReport) | Relatório de históricos por faixa de matrícula, tipo e período, em página horizontal. Mostra cada funcionário com as linhas do histórico, a origem (manual, automática ou carga), a situação e os valores anterior e novo já em texto. |
-| [`ZGPM010.tlpp`](ZGPM010.tlpp) | Rotina de carga | Carga inicial: grava o valor atual dos campos monitorados para todos os funcionários não demitidos da filial que ainda não têm histórico daquele tipo. `U_ZGPM010` roda com tela de confirmação; `U_ZGPM010J` roda sem interface (job/Schedule). |
-| [`GPE10OPC.tlpp`](GPE10OPC.tlpp) | Ponto de entrada | Inclui a opção **"Históricos"** no menu do Cadastro de Funcionários (GPEA010). Por estar na MenuDef, a opção também aparece no cadastro de Privilégios. |
-| [`GPE10MENU.prw`](GPE10MENU.prw) | Ponto de entrada | Mesma opção "Históricos" para ambientes cujo GPEA010 ainda não chama o GPE10OPC. Se a opção já existir, não duplica. |
-| [`GP010AGRV.tlpp`](GP010AGRV.tlpp) | Ponto de entrada | Roda depois que o Cadastro de Funcionários grava uma inclusão ou alteração e chama `U_ZGPX010G` para registrar automaticamente o que mudou. Se falhar, só registra no log, sem travar a gravação do funcionário. |
-| [`teste/ZGPTST.prw`](teste/ZGPTST.prw) | Teste (só base local) | Testes automáticos do projeto: regras da tela por tipo, gravação manual, bloqueio de dependente inválido, gravação automática (grava quando muda e não grava quando não muda), proteção das linhas automáticas e carga inicial sem duplicar. Roda em job como programa inicial `U_ZGPTST`. **Não compilar no cliente.** |
+| [`CBGPEX01.prw`](CBGPEX01.prw) | Funções de apoio | Base do projeto, usada pelos outros fontes (funções `U_CBXHIS*`). Lista os 13 tipos de histórico (`U_CBXHISC`, combo do `ZHF_TIPO`), inicializadores, próxima sequência e o mapa de campos monitorados (`MV_ZHFCPOS`). A função principal é `U_CBXHISG`: compara os campos monitorados do funcionário com o último histórico de cada tipo, pede Data Inicial/Final/Processo quando há tela e grava a linha nova; também acerta a Data Final quando só o prazo do adicional muda. Traz o bloqueio de prazo/datas do adicional (`U_CBXHISW`, `U_CBXHISK`), a auditoria (`U_CBXHISA`) e o texto dos valores para tela e relatório (`U_CBXHISV`). |
+| [`CBGPEA21.prw`](CBGPEA21.prw) | Tela MVC | Cadastro dos históricos (browse + formulário). `U_CBGPEA21` abre com todos os funcionários; `U_CBGPA21F` abre filtrada no funcionário posicionado (opção "Históricos" do cadastro). Mostra o valor anterior/novo também por extenso (ex.: `1 - 50/50`). Outras Ações: Auditoria, Legenda, Relatório e Carga inicial. Linhas automáticas não podem ser excluídas. |
+| [`CBGPER20.prw`](CBGPER20.prw) | Relatório (TReport) | Relatório por faixa de matrícula, tipo e período, em paisagem, com origem, situação, valores em texto e quem incluiu/alterou. |
+| [`CBGPEM13.prw`](CBGPEM13.prw) | Rotina de carga | Carga inicial: grava o valor atual dos campos monitorados de todos os funcionários não demitidos da filial que ainda não têm histórico daquele tipo. `U_CBGPEM13` com tela; `U_CBGPM13J` sem interface (job/Schedule). |
+| [`UPDZHF00.prw`](UPDZHF00.prw) | Compatibilizador | Cria a tabela ZHF (SX2, SX3, SIX e o gatilho da matrícula) e a tabela física. Tem modo Simular; não grava nada se encontrar inconsistência. |
+| [`UPDZHF01.prw`](UPDZHF01.prw) | Compatibilizador | Campos da v3: prazo e datas dos adicionais na aba Adicionais da SRA, campos de auditoria na ZHF e a tabela ZHG. Também com modo Simular. |
+| [`GPE10OPC.prw`](GPE10OPC.prw) | Ponto de entrada | Opção **"Históricos"** na MenuDef do Cadastro de Funcionários (GPEA010); aparece em Privilégios. |
+| [`GP011MEN.prw`](GP011MEN.prw) | Ponto de entrada | Mesma opção na **Gestão de Funcionários** (GPEA011). |
+| [`GPE10MENU.prw`](GPE10MENU.prw) | Ponto de entrada | Opção "Históricos" para ambientes cujo GPEA010 não chama o GPE10OPC; não duplica. |
+| [`GP010AGRV.tlpp`](GP010AGRV.tlpp) | Ponto de entrada | Depois de gravar o funcionário, chama `U_CBXHISG("2")`. Se falhar, só registra no log, sem travar a gravação. |
 
-## Dicionário (tabela ZHF)
+Se o ambiente já tiver algum desses pontos de entrada, juntar o trecho deste projeto ao fonte existente e compilar **com o nome de arquivo original** (outro nome dá "Duplicated function").
 
-| Campo | Tipo | Tamanho | Descrição |
-|---|---|---|---|
-| ZHF_FILIAL | C | 2 | Filial |
-| ZHF_MAT | C | 6 | Matrícula do funcionário (gatilho preenche o nome) |
-| ZHF_NOME | C | 30 | Nome (virtual) |
-| ZHF_TIPO | C | 2 | Tipo do histórico (combo `#U_ZGPX010C()`) |
-| ZHF_SEQ | C | 3 | Sequência por filial + matrícula + tipo |
-| ZHF_DATA | D | 8 | Data do evento |
-| ZHF_SITUAC | C | 1 | Situação Sim/Não (tipos 02, 03, 08, 11, 12, 13) |
-| ZHF_PENAL | C | 1 | Penalidade (tipo 04) |
-| ZHF_TPAUX | C | 1 | Tipo de auxílio (tipo 09): 1 = Creche, 2 = Creche judicial, 3 = Financeiro, 4 = Financeiro judicial |
-| ZHF_DEPEND | C | 2 | Dependente |
-| ZHF_PROCES | C | 40 | Processo / documento |
-| ZHF_VLANT | C | 60 | Valor anterior |
-| ZHF_VLNOV | C | 60 | Valor novo |
-| ZHF_ORIGEM | C | 1 | 1 = Manual, 2 = Automática (cadastro), 3 = Carga inicial |
-| ZHF_USER | C | 25 | Usuário que gravou |
-| ZHF_DTINC | D | 8 | Data da inclusão |
-| ZHF_HRINC | C | 8 | Hora da inclusão |
+## Dicionário
 
-Índices: `1 = ZHF_FILIAL + ZHF_MAT + ZHF_TIPO + ZHF_SEQ` e `2 = ZHF_FILIAL + ZHF_TIPO + DTOS(ZHF_DATA)`.
+**ZHF** (25 campos): filial, matrícula, nome, tipo, sequência, Data Inicial, Data Final, situação, penalidade, tipo de auxílio, dependente, processo, valor anterior, valor novo, origem (1 = manual, 2 = automática, 3 = carga) e auditoria (usuário, código e matrícula de quem incluiu e de quem alterou, datas e horas). Índices `ZHF_FILIAL + ZHF_MAT + ZHF_TIPO + ZHF_SEQ` e `ZHF_FILIAL + ZHF_TIPO + DTOS(ZHF_DATA)`.
 
-Parâmetro **`MV_ZHFCPOS`**: liga cada tipo ao campo da SRA que é monitorado na gravação automática. Padrão: `01=RA_XCODFUN;05=RA_ADCPERI;06=RA_ADCINS;07=RA_XPERELE;10=RA_XOPTICK` (função gratificada, periculosidade, insalubridade, periculosidade judicial e opção de ticket). Campos que não existem no ambiente são ignorados.
+**ZHG**: log de auditoria (operação, usuário, data, hora, rotina e detalhe).
+
+**SRA** (aba Adicionais): `RA_XPERPRZ`, `RA_XPERDTI`, `RA_XPERDTF`, `RA_XINSPRZ`, `RA_XINSDTI`, `RA_XINSDTF`.
+
+Parâmetros opcionais (o padrão está no fonte): `MV_ZHFCPOS` = `01=RA_XCODFUN;05=RA_ADCPERI;06=RA_ADCINS;07=RA_XPERELE;10=RA_XOPTICK` e `MV_ZHFDTS` = `05=RA_XPERDTI,RA_XPERDTF,RA_XPERPRZ;06=RA_XINSDTI,RA_XINSDTF,RA_XINSPRZ`.
 
 ## Como instalar
 
-1. Criar a tabela ZHF, os índices, o gatilho `ZHF_MAT → ZHF_NOME` e o parâmetro `MV_ZHFCPOS` no dicionário.
-2. Compilar os 7 fontes da pasta (sem o `teste/`). Os `.tlpp` precisam do include `tlpp-core.th`.
-3. Se o ambiente já tiver algum dos pontos de entrada (GPE10OPC, GPE10MENU, GP010AGRV), juntar o trecho deste projeto ao fonte que já existe.
-4. Rodar a carga inicial (`U_ZGPM010`) uma vez em cada filial.
-5. Incluir `U_ZGPA010` e `U_ZGPR010` no menu do SIGAGPE.
+1. Backup do banco e dos RPOs; ninguém usando o Cadastro de Funcionários.
+2. Compilar os 10 fontes de uma vez.
+3. Rodar `U_UPDZHF00` e depois `U_UPDZHF01` (primeiro Simular, depois Executar) por um item de menu temporário do SIGAGPE. O Configurador bloqueia funções de usuário; como Programa Inicial funciona, mas consome uma licença a mais. O aviso "__SetX31Mode será descontinuada" é só informativo.
+4. Incluir `CBGPEA21` (Históricos) e `CBGPER20` (Relatório) no menu do SIGAGPE.
+5. Rodar a **Carga inicial** (Outras Ações da tela de Históricos) uma vez em cada filial, antes de alterarem cadastros.

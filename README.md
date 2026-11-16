@@ -6,7 +6,7 @@ Bem-vindo ao meu repositório de trabalho! Aqui você encontrará o código-font
 
 | Pasta | O que é |
 |---|---|
-| [`historicos-funcionario/`](historicos-funcionario/) | **Históricos do Funcionário (SIGAGPE).** Tabela própria (ZHF) com o histórico de função gratificada, adicionais, licenças, penalidades, auxílios e outros, com tela MVC, relatório, carga inicial e gravação automática ao salvar o Cadastro de Funcionários. 7 fontes + 1 de teste. |
+| [`historicos-funcionario/`](historicos-funcionario/) | **Históricos do Funcionário (SIGAGPE).** Tabela própria (ZHF) com o histórico de função gratificada, adicionais, licenças, penalidades, auxílios e outros, com Data Inicial/Final, auditoria (ZHG), tela MVC, relatório, carga inicial, compatibilizadores e gravação automática ao salvar o Cadastro ou a Gestão de Funcionários. 10 fontes. |
 | [`importadores/`](importadores/) | **Importadores do Configurador.** Importação de usuários e grupos (ZIMPUSR) e de regras de privilégio (ZIMPPRV) a partir de CSV, pelos modelos MVC padrão. |
 
 Cada pasta tem um README com a explicação de cada fonte, e todo fonte tem um cabeçalho Protheus.doc descrevendo o que faz.

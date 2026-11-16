@@ -1,7 +1,6 @@
-#include "tlpp-core.th"
 #include "totvs.ch"
 
-/*/{Protheus.doc} ZGPM010
+/*/{Protheus.doc} CBGPEM13
 Carga inicial dos Históricos do Funcionário: grava o valor atual dos campos
 monitorados (parâmetro MV_ZHFCPOS) de todos os funcionários não demitidos da
 filial corrente que ainda não têm histórico daquele tipo. Rodar uma vez por filial.
@@ -9,7 +8,7 @@ filial corrente que ainda não têm histórico daquele tipo. Rodar uma vez por fili
 @author João Victor Guimarães Alves
 @since 29/10/2026
 /*/
-User Function ZGPM010()
+User Function CBGPEM13()
     Local nGrav := 0 as Numeric
 
     If !MsgYesNo("Gravar a carga inicial dos históricos da filial " + AllTrim(cFilAnt) + "?" + CRLF + ;
@@ -22,14 +21,14 @@ User Function ZGPM010()
     MsgInfo("Carga concluída: " + cValToChar(nGrav) + " linha(s) gravada(s).", "Carga inicial")
 Return
 
-/*/{Protheus.doc} ZGPM010J
+/*/{Protheus.doc} CBGPM13J
 Carga inicial sem interface (para rodar como job ou pelo Schedule).
 @type user function
 @author João Victor Guimarães Alves
 @since 29/10/2026
 @return numeric, linhas gravadas
 /*/
-User Function ZGPM010J() as Numeric
+User Function CBGPM13J() as Numeric
 Return Carga()
 
 /*/{Protheus.doc} Carga
@@ -42,7 +41,7 @@ Percorre a SRA da filial e grava a carga inicial.
 Static Function Carga() as Numeric
     Local nGrav  := 0 as Numeric
     Local aArea  := GetArea() as Array
-    Local aMapa  := U_ZGPX010M() as Array
+    Local aMapa  := U_CBXHISM() as Array
     Local cFilRA := xFilial("SRA") as Character
 
     ProcRegua(SRA->(RecCount()))
@@ -52,12 +51,12 @@ Static Function Carga() as Numeric
     While !SRA->(Eof()) .And. SRA->RA_FILIAL == cFilRA
         IncProc("Matrícula " + SRA->RA_MAT)
         If SRA->RA_SITFOLH <> "D"
-            nGrav += U_ZGPX010G("3", aMapa)
+            nGrav += U_CBXHISG("3", aMapa)
         EndIf
         SRA->(DbSkip())
     EndDo
 
-    FWLogMsg("INFO", , "ZGPM010", "Carga", , "01", "Carga inicial ZHF filial " + cFilRA + ": " + cValToChar(nGrav) + " linha(s).", 0, 0, {})
+    FWLogMsg("INFO", , "CBGPEM13", "Carga", , "01", "Carga inicial ZHF filial " + cFilRA + ": " + cValToChar(nGrav) + " linha(s).", 0, 0, {})
 
     RestArea(aArea)
 Return nGrav

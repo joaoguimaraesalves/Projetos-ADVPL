@@ -14,7 +14,7 @@ PARAMIXB:
 @author João Victor Guimarães Alves
 @since 29/10/2026
 @obs Sem interface: pode rodar dentro da transação de gravação.
-     Se o ambiente já tiver um GP010AGRV, juntar a chamada U_ZGPX010G ao fonte existente.
+     Se o ambiente já tiver um GP010AGRV, juntar a chamada U_CBXHISG ao fonte existente.
 @see GPEA010
 /*/
 User Function GP010AGRV()
@@ -35,9 +35,9 @@ User Function GP010AGRV()
 
     If lGrava .And. (nOpc == 3 .Or. nOpc == 4)
         Try
-            U_ZGPX010G("2")
+            U_CBXHISG("2")
         Catch oError
-            FWLogMsg("ERROR", , "ZGPX010", "GP010AGRV", , "01", "Falha ao gravar histórico ZHF: " + oError:Description, 0, 0, {})
+            FWLogMsg("ERROR", , "CBGPEX01", "GP010AGRV", , "01", "Falha ao gravar histórico ZHF: " + oError:Description, 0, 0, {})
         EndTry
     EndIf
 Return Nil

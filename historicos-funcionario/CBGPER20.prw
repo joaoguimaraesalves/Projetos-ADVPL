@@ -1,21 +1,20 @@
-#include "tlpp-core.th"
 #include "totvs.ch"
 
-/*/{Protheus.doc} ZGPR010
+/*/{Protheus.doc} CBGPER20
 Relatório de Históricos do Funcionário (tabela ZHF), por funcionário,
 tipo e período. Inclui Penalidades/TAC e Comissão.
 @type user function
 @author João Victor Guimarães Alves
 @since 29/10/2026
 /*/
-User Function ZGPR010()
+User Function CBGPER20()
     Local aPergs  := {} as Array
     Local aResp   := {} as Array
     Local aTipos  := {} as Array
     Local oReport := Nil as Object
     Local nTamMat := TamSX3("RA_MAT")[1] as Numeric
 
-    aTipos := StrTokArr("00=Todos;" + U_ZGPX010C(), ";")
+    aTipos := StrTokArr("00=Todos;" + U_CBXHISC(), ";")
 
     aAdd(aPergs, {1, "Matrícula de",  Space(nTamMat),             "", "", "SRA", "", 50, .F.})
     aAdd(aPergs, {1, "Matrícula até", Replicate("Z", nTamMat),     "", "", "SRA", "", 50, .F.})
@@ -44,9 +43,9 @@ Static Function ReportDef(aResp as Array) as Object
     Local oSecFun := Nil as Object
     Local oSecHis := Nil as Object
     Local cTab    := GetNextAlias() as Character
-    Local aMapa   := U_ZGPX010M() as Array
+    Local aMapa   := U_CBXHISM() as Array
 
-    oReport := TReport():New("ZGPR010", "Históricos do Funcionário", /*cPergunta*/, ;
+    oReport := TReport():New("CBGPER20", "Históricos do Funcionário", /*cPergunta*/, ;
         {|oRep| ReportPrint(oRep, cTab, oSecFun, oSecHis, aResp)}, ;
         "Lista os históricos do funcionário (tabela ZHF) por matrícula, tipo e período.")
     oReport:SetLandscape()
@@ -57,15 +56,17 @@ Static Function ReportDef(aResp as Array) as Object
 
     oSecHis := TRSection():New(oSecFun, "Históricos", {"ZHF"})
     // Células de data e valores com nome fora do dicionário: com o nome do campo (ex.: "ZHF_DATA") o TReport usa o tamanho do SX3 e corta o conteúdo.
-    TRCell():New(oSecHis, "TIPO",       "", "Tipo",        , 28, .F., {|| U_ZGPX010T((cTab)->ZHF_TIPO)})
-    TRCell():New(oSecHis, "DATAHIST",   "", "Data",        , 12, .F., {|| DToC(SToD((cTab)->ZHF_DATA))})
-    TRCell():New(oSecHis, "SITUACAO",   "", "Situação",    , 20, .F., {|| U_ZGPX010D((cTab)->ZHF_TIPO, (cTab)->ZHF_SITUAC, (cTab)->ZHF_PENAL, (cTab)->ZHF_TPAUX)})
+    TRCell():New(oSecHis, "TIPO",       "", "Tipo",        , 28, .F., {|| U_CBXHIST((cTab)->ZHF_TIPO)})
+    TRCell():New(oSecHis, "DATAHIST",   "", "Data inicial", , 12, .F., {|| DToC(SToD((cTab)->ZHF_DATA))})
+    TRCell():New(oSecHis, "DATAFIM",    "", "Data final",  , 12, .F., {|| IIf(Empty((cTab)->ZHF_DTFIM), "", DToC(SToD((cTab)->ZHF_DTFIM)))})
+    TRCell():New(oSecHis, "SITUACAO",   "", "Situação",    , 20, .F., {|| U_CBXHISD((cTab)->ZHF_TIPO, (cTab)->ZHF_SITUAC, (cTab)->ZHF_PENAL, (cTab)->ZHF_TPAUX)})
     TRCell():New(oSecHis, "ZHF_DEPEND", "", "Dep.",        , 5,  .F., {|| (cTab)->ZHF_DEPEND})
-    TRCell():New(oSecHis, "ZHF_PROCES", "", "Processo",    , 40, .F., {|| (cTab)->ZHF_PROCES})
-    TRCell():New(oSecHis, "VALANT",     "", "Valor ant.",  , 35, .F., {|| U_ZGPX010V((cTab)->ZHF_TIPO, (cTab)->ZHF_VLANT, aMapa)})
-    TRCell():New(oSecHis, "VALNOV",     "", "Valor novo",  , 35, .F., {|| U_ZGPX010V((cTab)->ZHF_TIPO, (cTab)->ZHF_VLNOV, aMapa)})
+    TRCell():New(oSecHis, "ZHF_PROCES", "", "Processo",    , TamSX3("ZHF_PROCES")[1] + 2, .F., {|| (cTab)->ZHF_PROCES})
+    TRCell():New(oSecHis, "VALANT",     "", "Valor ant.",  , 35, .F., {|| U_CBXHISV((cTab)->ZHF_TIPO, (cTab)->ZHF_VLANT, aMapa)})
+    TRCell():New(oSecHis, "VALNOV",     "", "Valor novo",  , 35, .F., {|| U_CBXHISV((cTab)->ZHF_TIPO, (cTab)->ZHF_VLNOV, aMapa)})
     TRCell():New(oSecHis, "ORIGEM",     "", "Origem",      , 14, .F., {|| DescOrigem((cTab)->ZHF_ORIGEM)})
-    TRCell():New(oSecHis, "ZHF_USER",   "", "Usuário",     , 25, .F., {|| (cTab)->ZHF_USER})
+    TRCell():New(oSecHis, "ZHF_USER",   "", "Incluído por", , 34, .F., {|| AllTrim((cTab)->ZHF_USER) + IIf(Empty((cTab)->ZHF_MATINC), "", " (mat. " + AllTrim((cTab)->ZHF_MATINC) + ")")})
+    TRCell():New(oSecHis, "ALTERADO",   "", "Última alteração", , 48, .F., {|| IIf(Empty((cTab)->ZHF_USRALT), "", AllTrim((cTab)->ZHF_USRALT) + IIf(Empty((cTab)->ZHF_MATALT), "", " (mat. " + AllTrim((cTab)->ZHF_MATALT) + ")") + " " + DToC(SToD((cTab)->ZHF_DTALT)))})
 Return oReport
 
 /*/{Protheus.doc} ReportPrint
@@ -97,9 +98,9 @@ Static Function ReportPrint(oReport as Object, cTab as Character, oSecFun as Obj
         cDataAt := "99991231"
     EndIf
 
-    cQuery := "SELECT ZHF.ZHF_MAT, ZHF.ZHF_TIPO, ZHF.ZHF_SEQ, ZHF.ZHF_DATA, ZHF.ZHF_SITUAC, ZHF.ZHF_PENAL, "
+    cQuery := "SELECT ZHF.ZHF_MAT, ZHF.ZHF_TIPO, ZHF.ZHF_SEQ, ZHF.ZHF_DATA, ZHF.ZHF_DTFIM, ZHF.ZHF_SITUAC, ZHF.ZHF_PENAL, "
     cQuery += "ZHF.ZHF_TPAUX, ZHF.ZHF_DEPEND, ZHF.ZHF_PROCES, ZHF.ZHF_VLANT, ZHF.ZHF_VLNOV, ZHF.ZHF_ORIGEM, "
-    cQuery += "ZHF.ZHF_USER, COALESCE(SRA.RA_NOME, ' ') RA_NOME "
+    cQuery += "ZHF.ZHF_USER, ZHF.ZHF_USRALT, ZHF.ZHF_DTALT, ZHF.ZHF_MATINC, ZHF.ZHF_MATALT, COALESCE(SRA.RA_NOME, ' ') RA_NOME "
     cQuery += "FROM " + RetSqlName("ZHF") + " ZHF "
     cQuery += "LEFT JOIN " + RetSqlName("SRA") + " SRA "
     cQuery += "  ON SRA.RA_FILIAL = ? AND SRA.RA_MAT = ZHF.ZHF_MAT AND SRA.D_E_L_E_T_ = ? "
@@ -165,7 +166,7 @@ Static Function TipoEscolhido(xResp as Variant) as Character
     Local aOpc  := {} as Array
 
     If ValType(xResp) == "N"
-        aOpc := StrTokArr("00=Todos;" + U_ZGPX010C(), ";")
+        aOpc := StrTokArr("00=Todos;" + U_CBXHISC(), ";")
         If xResp >= 1 .And. xResp <= Len(aOpc)
             cTipo := Left(aOpc[xResp], 2)
         EndIf
