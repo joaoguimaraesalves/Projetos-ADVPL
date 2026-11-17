@@ -6,6 +6,7 @@ O histórico é gravado de três jeitos:
 
 - **Manual**: pela tela de Históricos (legenda verde).
 - **Automático**: ao salvar o Cadastro ou a Gestão de Funcionários, os campos monitorados que mudaram viram uma linha nova (legenda azul). O histórico novo fecha o anterior do mesmo tipo (Data Final).
+- **Auxílio creche/financeiro (tipo 09)**: ao salvar o cadastro de Dependentes, o auxílio de cada dependente que mudou vira uma linha nova, tem as datas acertadas ou é encerrado, sempre por dependente.
 - **Carga inicial**: grava a situação atual de todos os funcionários, uma vez por filial (legenda amarela).
 
 Cada histórico tem **Data Inicial, Data Final e Processo**, e toda inclusão, alteração ou exclusão fica registrada na tabela de auditoria **ZHG** (quem, quando e o que mudou). Na aba **Adicionais** do cadastro entram o prazo e as datas de início e fim da periculosidade e da insalubridade, que só abrem quando o funcionário tem o adicional.
@@ -17,14 +18,16 @@ Os nomes seguem o padrão do ambiente do cliente (`CBGPE` + tipo + número, tudo
 | Fonte | Tipo | O que faz |
 |---|---|---|
 | [`CBGPEX01.prw`](CBGPEX01.prw) | Funções de apoio | Base do projeto, usada pelos outros fontes (funções `U_CBXHIS*`). Lista os 13 tipos de histórico (`U_CBXHISC`, combo do `ZHF_TIPO`), inicializadores, próxima sequência e o mapa de campos monitorados (`MV_ZHFCPOS`). A função principal é `U_CBXHISG`: compara os campos monitorados do funcionário com o último histórico de cada tipo, pede Data Inicial/Final/Processo quando há tela e grava a linha nova; também acerta a Data Final quando só o prazo do adicional muda. `U_CBXHISG` também aceita uma data fixa e um motivo (`U_CBXHISG(cOrigem, aMapa, dData, cMotivo)`), para ser chamada por outras rotinas, como as de transferência, sem abrir a janela de datas. Traz o bloqueio de prazo/datas do adicional (`U_CBXHISW`, `U_CBXHISK`), a auditoria (`U_CBXHISA`), o texto dos valores para tela e relatório (`U_CBXHISV`) e a descrição por extenso da linha para a coluna Descrição do browse (`U_CBXHISE`). |
+| [`CBGPEX02.prw`](CBGPEX02.prw) | Funções de apoio | Histórico automático do **auxílio creche/financeiro** (tipo 09) a partir do cadastro de Dependentes. `U_CBXAUXG(cOrigem, cFil, cMat)` compara, por dependente, o auxílio cadastrado (`RB_XCRECHE`, `RB_DTINAUX`, `RB_DTFIAUX`) com o último histórico tipo 09 daquele dependente: auxílio novo inclui linha; tipo mudou inclui linha e fecha a anterior na Data Inicial da nova; só as datas mudaram acerta a última linha; auxílio retirado ou dependente excluído fecha a última linha. Na carga inicial só inclui o que falta. `U_CBXAUXP(oModel)` é a chamada do ponto de entrada, protegida (erro vai só para o log). Não abre janela: o processo dos auxílios judiciais é completado na tela de Históricos. |
 | [`CBGPEA21.prw`](CBGPEA21.prw) | Tela MVC | Cadastro dos históricos (browse + formulário). `U_CBGPEA21` abre com todos os funcionários; `U_CBGPA21F` abre filtrada no funcionário posicionado (opção "Históricos" do cadastro). Mostra o valor anterior/novo também por extenso (ex.: `1 - 50/50`). O browse tem a coluna **Descrição** (valor novo por extenso ou a situação/penalidade) e abre na **ordem de gravação** (a alteração mais recente por último) quando existe o índice por data/hora de inclusão. Outras Ações: Auditoria, Legenda, Relatório e Carga inicial. Linhas automáticas não podem ser excluídas. |
 | [`CBGPER20.prw`](CBGPER20.prw) | Relatório (TReport) | Relatório por faixa de matrícula, tipo e período (pela Data Inicial; data final em branco = sem limite), em paisagem, com origem, situação, valores em texto e quem incluiu/alterou. |
-| [`CBGPEM13.prw`](CBGPEM13.prw) | Rotina de carga | Carga inicial: grava o valor atual dos campos monitorados de todos os funcionários não demitidos da filial que ainda não têm histórico daquele tipo. `U_CBGPEM13` com tela; `U_CBGPM13J` sem interface (job/Schedule). |
+| [`CBGPEM13.prw`](CBGPEM13.prw) | Rotina de carga | Carga inicial: grava o valor atual dos campos monitorados de todos os funcionários não demitidos da filial que ainda não têm histórico daquele tipo, e o auxílio creche/financeiro dos dependentes que ainda não têm histórico (`U_CBXAUXG`). `U_CBGPEM13` com tela; `U_CBGPM13J` sem interface (job/Schedule). |
 | [`UPDZHF00.prw`](UPDZHF00.prw) | Compatibilizador | Cria a tabela ZHF (SX2, SX3, SIX e o gatilho da matrícula) e a tabela física. Tem modo Simular; não grava nada se encontrar inconsistência. |
 | [`UPDZHF01.prw`](UPDZHF01.prw) | Compatibilizador | Campos da v3: prazo e datas dos adicionais na aba Adicionais da SRA (prazo opcional: `Vazio() .Or. Pertence("12")`), campos de auditoria na ZHF, a tabela ZHG, o campo virtual `ZHF_DESCR` (coluna Descrição, logo depois do Nome) e o índice por data/hora de inclusão. Também com modo Simular. |
 | [`GPE10OPC.prw`](GPE10OPC.prw) | Ponto de entrada | Opção **"Históricos"** na MenuDef do Cadastro de Funcionários (GPEA010); aparece em Privilégios. |
 | [`GP011MEN.prw`](GP011MEN.prw) | Ponto de entrada | Mesma opção na **Gestão de Funcionários** (GPEA011). |
 | [`GPE10MENU.prw`](GPE10MENU.prw) | Ponto de entrada | Opção "Históricos" para ambientes cujo GPEA010 não chama o GPE10OPC; não duplica. |
+| [`GPEA020_PE.prw`](GPEA020_PE.prw) | Ponto de entrada | `User Function GPEA020` (cadastro de Dependentes, MVC): no momento `MODELCOMMITNTTS`, depois da gravação, chama `U_CBXAUXP`. |
 | [`GP010AGRV.tlpp`](GP010AGRV.tlpp) | Ponto de entrada | Depois de gravar o funcionário, chama `U_CBXHISG("2")`. Se falhar, só registra no log, sem travar a gravação. |
 
 Se o ambiente já tiver algum desses pontos de entrada, juntar o trecho deste projeto ao fonte existente e compilar **com o nome de arquivo original** (outro nome dá "Duplicated function").
@@ -52,7 +55,7 @@ O histórico anterior recebe a Data Final igual à data informada e a linha nova
 ## Como instalar
 
 1. Backup do banco e dos RPOs; ninguém usando o Cadastro de Funcionários.
-2. Compilar os 10 fontes de uma vez.
+2. Compilar os 12 fontes de uma vez.
 3. Rodar `U_UPDZHF00` e depois `U_UPDZHF01` (primeiro Simular, depois Executar) por um item de menu temporário do SIGAGPE. O Configurador bloqueia funções de usuário; como Programa Inicial funciona, mas consome uma licença a mais. O aviso "__SetX31Mode será descontinuada" é só informativo.
 4. Incluir `CBGPEA21` (Históricos) e `CBGPER20` (Relatório) no menu do SIGAGPE.
 5. Rodar a **Carga inicial** (Outras Ações da tela de Históricos) uma vez em cada filial, antes de alterarem cadastros.

@@ -2,7 +2,8 @@
 
 /*/{Protheus.doc} CBGPEM13
 Carga inicial dos Históricos do Funcionário: grava o valor atual dos campos
-monitorados (parâmetro MV_ZHFCPOS) de todos os funcionários não demitidos da
+monitorados (parâmetro MV_ZHFCPOS) e o auxílio creche/financeiro dos dependentes
+(tipo 09, U_CBXAUXG) de todos os funcionários não demitidos da
 filial corrente que ainda não têm histórico daquele tipo. Rodar uma vez por filial.
 @type user function
 @author João Victor Guimarães Alves
@@ -52,6 +53,10 @@ Static Function Carga() as Numeric
         IncProc("Matrícula " + SRA->RA_MAT)
         If SRA->RA_SITFOLH <> "D"
             nGrav += U_CBXHISG("3", aMapa)
+            // Auxílio creche/financeiro dos dependentes (tipo 09), 17/11/2026
+            If FindFunction("U_CBXAUXG")
+                nGrav += U_CBXAUXG("3", SRA->RA_FILIAL, SRA->RA_MAT)
+            EndIf
         EndIf
         SRA->(DbSkip())
     EndDo

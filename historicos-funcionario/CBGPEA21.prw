@@ -378,7 +378,7 @@ Return lRet
 
 /*/{Protheus.doc} Grava
 Gravação do modelo. Na inclusão, fecha o histórico anterior do mesmo tipo
-(Data Final vazia recebe a Data Inicial do novo). Inclusão, alteração e
+(Data Final vazia recebe a Data Inicial do novo; no tipo 09, do mesmo dependente). Inclusão, alteração e
 exclusão entram no log de auditoria (ZHG).
 @type static function
 @author João Victor Guimarães Alves
@@ -417,7 +417,8 @@ Static Function Grava(oModel as Object) as Logical
             U_CBXHISA(cFil, cMat, cTipo, cSeq, IIf(nOper == MODEL_OPERATION_INSERT, "1", IIf(nOper == MODEL_OPERATION_DELETE, "3", "2")), cDet)
         EndIf
         If nOper == MODEL_OPERATION_INSERT
-            U_CBXHISF(cFil, cMat, cTipo, cSeq, dIni)
+            // Tipo 09: fecha só o anterior do mesmo dependente (17/11/2026)
+            U_CBXHISF(cFil, cMat, cTipo, cSeq, dIni, oCab:GetValue("ZHF_DEPEND"))
         EndIf
     EndIf
     cHisDetAlt := ""

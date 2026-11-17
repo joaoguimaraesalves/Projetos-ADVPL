@@ -346,9 +346,11 @@ Não mexe se o anterior já tem Data Final ou começa depois do novo.
 @param cTipo, character, tipo do histórico
 @param cSeqNova, character, sequência do histórico novo
 @param dIni, date, Data Inicial do histórico novo
+@param cDepend, character, dependente (opcional; tipo 09). Informado, fecha só o anterior
+do MESMO dependente (17/11/2026: antes um auxílio do dependente B fechava o do A).
 @return logical, .T. quando fechou o anterior
 /*/
-User Function CBXHISF(cFil as Character, cMat as Character, cTipo as Character, cSeqNova as Character, dIni as Date) as Logical
+User Function CBXHISF(cFil as Character, cMat as Character, cTipo as Character, cSeqNova as Character, dIni as Date, cDepend as Character) as Logical
     Local lFechou := .F. as Logical
     Local aArea   := GetArea() as Array
     Local aAreaZH := ZHF->(GetArea()) as Array
@@ -362,7 +364,16 @@ User Function CBXHISF(cFil as Character, cMat as Character, cTipo as Character, 
     ZHF->(DbSeek(cChave + cSeqNova, .T.))
     ZHF->(DbSkip(-1))
 
+    // Tipo 09: volta até o último histórico do mesmo dependente
+    If cTipo == "09" .And. !Empty(cDepend)
+        While !ZHF->(Bof()) .And. !ZHF->(Eof()) .And. ZHF->(ZHF_FILIAL + ZHF_MAT + ZHF_TIPO) == cChave ;
+            .And. ZHF->ZHF_DEPEND <> cDepend
+            ZHF->(DbSkip(-1))
+        EndDo
+    EndIf
+
     If !ZHF->(Bof()) .And. !ZHF->(Eof()) .And. ZHF->(ZHF_FILIAL + ZHF_MAT + ZHF_TIPO) == cChave ;
+        .And. (cTipo <> "09" .Or. Empty(cDepend) .Or. ZHF->ZHF_DEPEND == cDepend) ;
         .And. ZHF->ZHF_SEQ < cSeqNova .And. Empty(ZHF->ZHF_DTFIM) .And. ZHF->ZHF_DATA <= dIni
         RecLock("ZHF", .F.)
         ZHF->ZHF_DTFIM := dIni
