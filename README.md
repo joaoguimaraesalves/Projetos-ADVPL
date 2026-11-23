@@ -1,6 +1,9 @@
 <div align="center">
 
-<img src="https://upload.wikimedia.org/wikipedia/commons/0/0c/Logotipo_da_Totvs_%282025%29.svg" alt="TOTVS" height="56">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/totvs-logo-white.png">
+  <img src="assets/totvs-logo.png" alt="TOTVS" height="56">
+</picture>
 &nbsp;&nbsp;&nbsp;&nbsp;
 <img src="assets/advpl.svg" alt="AdvPL" height="56">
 &nbsp;
