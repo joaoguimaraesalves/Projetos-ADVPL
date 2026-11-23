@@ -4,7 +4,7 @@ Customização do módulo **Gestão de Pessoal** que guarda, numa tabela própri
 
 O histórico é gravado de três jeitos:
 
-- **Manual**: pela tela de Históricos (legenda verde).
+- **Manual**: pela tela de Históricos (legenda verde). Aceita históricos antigos lançados depois (retroativos): o histórico atual é sempre o de Data Inicial mais recente, e o retroativo sem Data Final termina sozinho no início do histórico seguinte.
 - **Automático**: ao salvar o Cadastro ou a Gestão de Funcionários, os campos monitorados que mudaram viram uma linha nova (legenda azul). O histórico novo fecha o anterior do mesmo tipo (Data Final).
 - **Auxílio creche/financeiro (tipo 09)**: ao salvar o cadastro de Dependentes, o auxílio de cada dependente que mudou vira uma linha nova, tem as datas acertadas ou é encerrado, sempre por dependente.
 - **Carga inicial**: grava a situação atual de todos os funcionários, uma vez por filial (legenda amarela).

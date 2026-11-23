@@ -107,7 +107,9 @@ User Function CBXHISS(cFil as Character, cMat as Character, cTipo as Character) 
     Local aArea   := GetArea() as Array
     Local aAreaZH := ZHF->(GetArea()) as Array
 
-    If UltimoHist(cFil, cMat, cTipo)
+    // Maior sequência + 1. O histórico "atual" é escolhido pela data (UltimoHist), mas a
+    // sequência continua crescente para não repetir a chave (23/11/2026).
+    If MaiorSeq(cFil, cMat, cTipo)
         cSeq := Soma1(ZHF->ZHF_SEQ)
     EndIf
 
@@ -225,7 +227,7 @@ User Function CBXHISG(cOrigem as Character, aMapa as Array, dDataFix as Date, cM
 
         If lTemHist
             cAnt := AllTrim(ZHF->ZHF_VLNOV)
-            cSeq := Soma1(ZHF->ZHF_SEQ)
+            cSeq := U_CBXHISS(cFilZHF, cMat, cTipo)
         EndIf
 
         If cOrigem == "3" .And. lTemHist
@@ -335,9 +337,13 @@ User Function CBXHISG(cOrigem as Character, aMapa as Array, dDataFix as Date, cM
 Return nGrav
 
 /*/{Protheus.doc} CBXHISF
-Fecha o histórico anterior do mesmo tipo: quando a Data Final dele está vazia,
-recebe a Data Inicial do histórico novo (pedido do cliente em 10/11/2026).
-Não mexe se o anterior já tem Data Final ou começa depois do novo.
+Acerta as datas em volta de um histórico novo do mesmo tipo, pela Data Inicial
+(e não pela sequência), para aceitar históricos lançados fora de ordem:
+- o histórico ANTERIOR (o de Data Inicial mais recente até a do novo), se estiver
+  sem Data Final, recebe a Data Inicial do novo (pedido do cliente em 10/11/2026);
+- o histórico novo, se ficou sem Data Final e existe um histórico POSTERIOR a ele
+  (lançamento retroativo), recebe a Data Inicial desse posterior (23/11/2026).
+Não mexe em Data Final já preenchida.
 @type user function
 @author João Victor Guimarães Alves
 @since 10/11/2026
@@ -346,42 +352,82 @@ Não mexe se o anterior já tem Data Final ou começa depois do novo.
 @param cTipo, character, tipo do histórico
 @param cSeqNova, character, sequência do histórico novo
 @param dIni, date, Data Inicial do histórico novo
-@param cDepend, character, dependente (opcional; tipo 09). Informado, fecha só o anterior
-do MESMO dependente (17/11/2026: antes um auxílio do dependente B fechava o do A).
+@param cDepend, character, dependente (opcional; tipo 09). Informado, considera só os
+históricos do MESMO dependente (17/11/2026: antes um auxílio do dependente B fechava o do A).
 @return logical, .T. quando fechou o anterior
 /*/
 User Function CBXHISF(cFil as Character, cMat as Character, cTipo as Character, cSeqNova as Character, dIni as Date, cDepend as Character) as Logical
-    Local lFechou := .F. as Logical
-    Local aArea   := GetArea() as Array
-    Local aAreaZH := ZHF->(GetArea()) as Array
-    Local cChave  := cFil + cMat + cTipo as Character
+    Local lFechou  := .F. as Logical
+    Local aArea    := GetArea() as Array
+    Local aAreaZH  := ZHF->(GetArea()) as Array
+    Local cChave   := cFil + cMat + cTipo as Character
+    Local cOrdNova := "" as Character
+    Local cOrdLin  := "" as Character
+    Local cOrdAnt  := "" as Character
+    Local cOrdPos  := "" as Character
+    Local nRecAnt  := 0 as Numeric
+    Local nRecPos  := 0 as Numeric
+    Local nRecNova := 0 as Numeric
+    Local lFiltDep := .F. as Logical
+    Local dIniPos  := CToD("") as Date
+    Local cSeqPos  := "" as Character
 
     If Empty(dIni)
         Return lFechou
     EndIf
 
-    ZHF->(DbSetOrder(1)) // ZHF_FILIAL+ZHF_MAT+ZHF_TIPO+ZHF_SEQ
-    ZHF->(DbSeek(cChave + cSeqNova, .T.))
-    ZHF->(DbSkip(-1))
+    lFiltDep := (cTipo == "09" .And. !Empty(cDepend))
+    cOrdNova := DToS(dIni) + cSeqNova
 
-    // Tipo 09: volta até o último histórico do mesmo dependente
-    If cTipo == "09" .And. !Empty(cDepend)
-        While !ZHF->(Bof()) .And. !ZHF->(Eof()) .And. ZHF->(ZHF_FILIAL + ZHF_MAT + ZHF_TIPO) == cChave ;
-            .And. ZHF->ZHF_DEPEND <> cDepend
-            ZHF->(DbSkip(-1))
-        EndDo
+    // Uma passada pelos históricos do tipo: localiza o novo, o anterior e o posterior a ele
+    ZHF->(DbSetOrder(1)) // ZHF_FILIAL+ZHF_MAT+ZHF_TIPO+ZHF_SEQ
+    ZHF->(DbSeek(cChave))
+    While !ZHF->(Eof()) .And. ZHF->(ZHF_FILIAL + ZHF_MAT + ZHF_TIPO) == cChave
+        If ZHF->ZHF_SEQ == cSeqNova
+            nRecNova := ZHF->(Recno())
+        ElseIf !lFiltDep .Or. ZHF->ZHF_DEPEND == cDepend
+            cOrdLin := DToS(ZHF->ZHF_DATA) + ZHF->ZHF_SEQ
+            If cOrdLin < cOrdNova
+                If cOrdLin > cOrdAnt
+                    cOrdAnt := cOrdLin
+                    nRecAnt := ZHF->(Recno())
+                EndIf
+            ElseIf Empty(cOrdPos) .Or. cOrdLin < cOrdPos
+                cOrdPos := cOrdLin
+                nRecPos := ZHF->(Recno())
+            EndIf
+        EndIf
+        ZHF->(DbSkip())
+    EndDo
+
+    // Anterior sem Data Final: termina na Data Inicial do novo
+    If nRecAnt > 0
+        ZHF->(DbGoTo(nRecAnt))
+        If Empty(ZHF->ZHF_DTFIM)
+            RecLock("ZHF", .F.)
+            ZHF->ZHF_DTFIM := dIni
+            U_CBXHISZ()
+            ZHF->(MsUnlock())
+            lFechou := .T.
+            U_CBXHISA(ZHF->ZHF_FILIAL, ZHF->ZHF_MAT, ZHF->ZHF_TIPO, ZHF->ZHF_SEQ, "2", ;
+                "Data Final: vazio -> " + U_CBXHISB(dIni) + " (fechado pelo histórico novo, sequência " + cSeqNova + ")")
+        EndIf
     EndIf
 
-    If !ZHF->(Bof()) .And. !ZHF->(Eof()) .And. ZHF->(ZHF_FILIAL + ZHF_MAT + ZHF_TIPO) == cChave ;
-        .And. (cTipo <> "09" .Or. Empty(cDepend) .Or. ZHF->ZHF_DEPEND == cDepend) ;
-        .And. ZHF->ZHF_SEQ < cSeqNova .And. Empty(ZHF->ZHF_DTFIM) .And. ZHF->ZHF_DATA <= dIni
-        RecLock("ZHF", .F.)
-        ZHF->ZHF_DTFIM := dIni
-        U_CBXHISZ()
-        ZHF->(MsUnlock())
-        lFechou := .T.
-        U_CBXHISA(ZHF->ZHF_FILIAL, ZHF->ZHF_MAT, ZHF->ZHF_TIPO, ZHF->ZHF_SEQ, "2", ;
-            "Data Final: vazio -> " + U_CBXHISB(dIni) + " (fechado pelo histórico novo, sequência " + cSeqNova + ")")
+    // Lançamento retroativo: o novo termina na Data Inicial do histórico posterior
+    If nRecPos > 0 .And. nRecNova > 0
+        ZHF->(DbGoTo(nRecPos))
+        dIniPos := ZHF->ZHF_DATA
+        cSeqPos := ZHF->ZHF_SEQ
+        ZHF->(DbGoTo(nRecNova))
+        If Empty(ZHF->ZHF_DTFIM) .And. !Empty(dIniPos)
+            RecLock("ZHF", .F.)
+            ZHF->ZHF_DTFIM := dIniPos
+            U_CBXHISZ()
+            ZHF->(MsUnlock())
+            U_CBXHISA(ZHF->ZHF_FILIAL, ZHF->ZHF_MAT, ZHF->ZHF_TIPO, ZHF->ZHF_SEQ, "2", ;
+                "Data Final: vazio -> " + U_CBXHISB(dIniPos) + " (histórico retroativo: termina no início do histórico sequência " + cSeqPos + ")")
+        EndIf
     EndIf
 
     RestArea(aAreaZH)
@@ -631,7 +677,9 @@ Static Function DataFuncao(lRetirada as Logical, dPadrao as Date) as Date
 Return dData
 
 /*/{Protheus.doc} UltimoHist
-Posiciona a ZHF no último histórico de filial + matrícula + tipo.
+Posiciona a ZHF no histórico atual de filial + matrícula + tipo: o de Data Inicial
+mais recente (empate: maior sequência). Antes era a maior sequência; mudou para
+aceitar históricos antigos lançados depois (23/11/2026).
 @type static function
 @author João Victor Guimarães Alves
 @since 29/10/2026
@@ -641,6 +689,43 @@ Posiciona a ZHF no último histórico de filial + matrícula + tipo.
 @return logical, .T. quando existe histórico (ZHF posicionada nele)
 /*/
 Static Function UltimoHist(cFil as Character, cMat as Character, cTipo as Character) as Logical
+    Local lAchou  := .F. as Logical
+    Local cChave  := "" as Character
+    Local cOrdem  := "" as Character
+    Local cMaior  := "" as Character
+    Local nRecno  := 0 as Numeric
+
+    cChave := cFil + cMat + cTipo
+
+    ZHF->(DbSetOrder(1)) // ZHF_FILIAL+ZHF_MAT+ZHF_TIPO+ZHF_SEQ
+    ZHF->(DbSeek(cChave))
+    While !ZHF->(Eof()) .And. ZHF->(ZHF_FILIAL + ZHF_MAT + ZHF_TIPO) == cChave
+        cOrdem := DToS(ZHF->ZHF_DATA) + ZHF->ZHF_SEQ
+        If cOrdem > cMaior
+            cMaior := cOrdem
+            nRecno := ZHF->(Recno())
+        EndIf
+        ZHF->(DbSkip())
+    EndDo
+
+    If nRecno > 0
+        ZHF->(DbGoTo(nRecno))
+        lAchou := .T.
+    EndIf
+Return lAchou
+
+/*/{Protheus.doc} MaiorSeq
+Posiciona a ZHF no histórico de maior sequência de filial + matrícula + tipo
+(base da próxima sequência).
+@type static function
+@author João Victor Guimarães Alves
+@since 23/11/2026
+@param cFil, character, filial
+@param cMat, character, matrícula
+@param cTipo, character, tipo
+@return logical, .T. quando existe histórico (ZHF posicionada nele)
+/*/
+Static Function MaiorSeq(cFil as Character, cMat as Character, cTipo as Character) as Logical
     Local lAchou := .F. as Logical
     Local cChave := "" as Character
 
