@@ -5,9 +5,9 @@
   <img src="assets/totvs-logo.png" alt="TOTVS" height="56">
 </picture>
 &nbsp;&nbsp;&nbsp;&nbsp;
-<img src="assets/advpl.svg" alt="AdvPL" height="56">
+<img src="assets/advpl.svg" alt="AdvPL" height="48">
 &nbsp;
-<img src="assets/tlpp.svg" alt="TLPP" height="56">
+<img src="assets/tlpp.svg" alt="TLPP" height="48">
 
 # Projetos e Fontes em AdvPL / TLPP
 
@@ -84,7 +84,6 @@
 <div align="center">
 <sub>
 Projeto pessoal, sem vínculo oficial com a TOTVS S.A. TOTVS, Protheus, AdvPL e TLPP são marcas dos seus respectivos donos.<br>
-Logotipo TOTVS: <a href="https://commons.wikimedia.org/wiki/File:Logotipo_da_Totvs_(2025).svg">Wikimedia Commons</a> (domínio público) ·
-Ícones AdvPL/TLPP: <a href="https://github.com/totvs/tds-vscode">totvs/tds-vscode</a> (Apache-2.0)
+Logotipo TOTVS: <a href="https://commons.wikimedia.org/wiki/File:Logotipo_da_Totvs_(2025).svg">Wikimedia Commons</a> (domínio público)
 </sub>
 </div>
