@@ -5,9 +5,9 @@
   <img src="assets/totvs-logo.png" alt="TOTVS" height="56">
 </picture>
 &nbsp;&nbsp;&nbsp;&nbsp;
-<img src="assets/advpl.svg" alt="AdvPL" height="48">
+<img src="assets/advpl-logo.svg" alt="AdvPL" height="48">
 &nbsp;
-<img src="assets/tlpp.svg" alt="TLPP" height="48">
+<img src="assets/tlpp-logo.svg" alt="TLPP" height="48">
 
 # Projetos e Fontes em AdvPL / TLPP
 
